@@ -1,0 +1,12 @@
+{
+  "name": "gesture-fruit-ninja",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Webcam hand-tracking fruit slicing game. No build step.",
+  "scripts": {
+    "start": "npx --yes serve . -l 5173",
+    "test": "node --test test/logic.test.mjs test/smoke.test.mjs",
+    "check": "node --check src/main.js && node --check src/logic.js"
+  }
+}

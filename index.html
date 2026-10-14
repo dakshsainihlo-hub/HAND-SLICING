@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gesture Fruit Ninja</title>
+<meta name="description" content="Slice fruit with your index finger. Webcam hand tracking runs locally in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#090B16; --bg2:#12162A; --violet:#8B5CF6; --cyan:#22D3EE; --coral:#FF4D6D; --mango:#FFAA33; --lime:#A3E635;
+  --text:#F8FAFC; --muted:#A7B0C5; --line:rgba(167,176,197,.18);
+  --display:'Bungee',Impact,'Arial Black',sans-serif;
+  --ui:'Sora',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);overflow:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:3px;border-radius:10px}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- buttons ---------- */
+.btn{border:0;border-radius:14px;padding:14px 24px;font-family:var(--display);font-size:1rem;letter-spacing:.02em;transition:transform .12s,box-shadow .2s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(135deg,var(--coral),var(--mango));color:#1a0b10;box-shadow:0 10px 30px -8px rgba(255,77,109,.7)}
+.btn.primary:hover{box-shadow:0 14px 36px -6px rgba(255,170,51,.75)}
+.btn.ghost{background:rgba(18,22,42,.7);border:1px solid var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--cyan)}
+.btn.big{padding:18px 34px;font-size:1.2rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;text-underline-offset:4px;padding:6px 0;font-size:.9rem}
+.link:hover{color:var(--text)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(18,22,42,.78);border:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+.chip b{color:var(--text)}
+button.chip:hover{border-color:var(--cyan);color:var(--text)}
+.iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(18,22,42,.78);display:grid;place-items:center;backdrop-filter:blur(8px)}
+.iconbtn:hover{border-color:var(--cyan)}
+.iconbtn svg{width:22px;height:22px;stroke:var(--text);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glass{background:rgba(18,22,42,.62);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+
+/* ---------- landing ---------- */
+.screen{position:fixed;inset:0;display:flex;align-items:center;z-index:5;pointer-events:none}
+.screen > *{pointer-events:auto}
+#menu{padding:clamp(20px,6vw,90px)}
+.menu-col{max-width:640px;display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+.logo{margin:0;line-height:.92;display:flex;flex-direction:column;gap:6px}
+.logo .g{font-family:var(--ui);font-weight:700;font-size:clamp(1.1rem,3vw,1.7rem);color:var(--cyan);letter-spacing:.34em;text-transform:uppercase}
+.cut{position:relative;display:inline-block;font-family:var(--display);font-size:clamp(3rem,11vw,7.6rem);white-space:nowrap}
+.cut .a,.cut .b{display:block;background:linear-gradient(100deg,var(--coral),var(--mango) 55%,var(--lime));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 8px 28px rgba(255,77,109,.35))}
+.cut .a{clip-path:polygon(0 0,100% 0,100% 30%,0 62%);transform:translate(-5px,-6px)}
+.cut .b{position:absolute;inset:0;clip-path:polygon(0 70%,100% 38%,100% 100%,0 100%);transform:translate(5px,6px)}
+.cut svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.cut line{stroke:var(--cyan);stroke-width:3;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 8px var(--cyan));stroke-dasharray:100;stroke-dashoffset:100;animation:slash .5s .25s ease-out forwards}
+@keyframes slash{to{stroke-dashoffset:0}}
+.tag{margin:0;font-size:clamp(1.05rem,2.4vw,1.4rem);color:var(--text)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.modes{display:flex;gap:6px;padding:5px;border-radius:14px;background:rgba(18,22,42,.7);border:1px solid var(--line)}
+.modes button{border:0;background:none;padding:9px 16px;border-radius:10px;color:var(--muted);font-weight:600;font-size:.9rem}
+.modes button[aria-checked="true"]{background:var(--violet);color:#fff}
+.modedesc{margin:0;color:var(--muted);font-size:.92rem;min-height:1.4em}
+.status-row{display:flex;gap:10px;flex-wrap:wrap}
+.privacy{margin:0;color:var(--muted);font-size:.8rem}
+
+/* ---------- panels / overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:rgba(9,11,22,.72);backdrop-filter:blur(6px)}
+.panel{width:min(760px,100%);max-height:calc(100% - 20px);overflow:auto;padding:clamp(20px,4vw,36px);border-radius:24px;background:linear-gradient(180deg,rgba(26,31,58,.96),rgba(18,22,42,.96));border:1px solid var(--line);box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.panel.narrow{width:min(460px,100%)}
+.panel h2{margin:0 0 6px;font-family:var(--display);font-weight:400;font-size:clamp(1.6rem,4.5vw,2.3rem)}
+.panel p{color:var(--muted);line-height:1.55}
+.panel .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.panel .stack{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.gcard{padding:16px;border-radius:18px;background:rgba(9,11,22,.6);border:1px solid var(--line);text-align:center}
+.gcard svg{width:100%;max-width:120px;height:110px}
+.gcard h3{margin:8px 0 4px;font-family:var(--display);font-weight:400;font-size:1.05rem}
+.gcard p{margin:0;font-size:.85rem}
+.hand{fill:#1c2142;stroke:var(--text);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.glow{stroke:var(--cyan);stroke-width:4;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 6px var(--cyan))}
+.a-point .glow{stroke-dasharray:40;animation:sweep 1.6s ease-in-out infinite}
+@keyframes sweep{0%{stroke-dashoffset:40;opacity:0}30%{opacity:1}100%{stroke-dashoffset:-40;opacity:0}}
+.a-fist .ring{fill:none;stroke:var(--coral);stroke-width:3;transform-origin:60px 55px;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.4);opacity:0}}
+.a-palm .hand{animation:bob 2s ease-in-out infinite;transform-origin:60px 100px}
+@keyframes bob{50%{transform:rotate(4deg)}}
+
+#setupSpin{width:38px;height:38px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--cyan);animation:spin 1s linear infinite;margin:8px 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.checks{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px}
+.checks li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(9,11,22,.6);border:1px solid var(--line)}
+.checks .box{width:26px;height:26px;border-radius:8px;border:2px solid var(--muted);display:grid;place-items:center;font-weight:700;color:transparent}
+.checks li.done{border-color:var(--lime)}
+.checks li.done .box{background:var(--lime);border-color:var(--lime);color:#0b1a02}
+.checks li.done .box::after{content:"\2713"}
+.detected{margin-top:14px;font-size:.9rem;color:var(--muted)}
+.detected b{color:var(--text)}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0 0 auto 0;z-index:8;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:max(12px,env(safe-area-inset-top)) 14px 0;pointer-events:none}
+#hud > *{pointer-events:auto}
+.hud-l{justify-self:start;padding:10px 18px;min-width:130px}
+.hud-c{justify-self:center;padding:10px 22px;text-align:center;min-width:130px}
+.hud-r{justify-self:end;display:flex;gap:8px;align-items:flex-start}
+.lbl{font-size:.72rem;color:var(--muted)}
+.num{font-family:var(--display);font-size:clamp(1.5rem,4vw,2.2rem);line-height:1.05}
+.combo{font-family:var(--display);color:var(--mango);font-size:.95rem;min-height:1.1em}
+.bar{height:5px;border-radius:5px;background:rgba(167,176,197,.2);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transform-origin:left;transition:transform .2s linear}
+.bestbox{padding:6px 14px;text-align:right}
+.bestbox b{font-family:var(--display);font-size:1.1rem;font-weight:400}
+#lives{font-size:.8rem;color:var(--coral);margin-top:4px}
+
+#hudBottom{position:fixed;right:14px;bottom:max(14px,env(safe-area-inset-bottom));z-index:8;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#gesture{padding:10px 16px;font-size:.88rem;font-weight:600;min-width:190px}
+#bombBtn{position:relative;overflow:hidden;padding:10px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(18,22,42,.78);font-weight:600;font-size:.88rem;min-width:170px;text-align:left}
+#bombBtn .fill{position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,77,109,.55),rgba(255,170,51,.55));transform-origin:left;transform:scaleX(0);transition:transform .15s linear}
+#bombBtn span{position:relative}
+#bombBtn.ready{border-color:var(--mango)}
+
+#cam{position:fixed;left:14px;bottom:max(14px,env(safe-area-inset-bottom));z-index:9;width:196px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.cam-view{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#000;transform:scaleX(-1)}
+.cam-view.off{opacity:0;height:1px;aspect-ratio:auto}
+.cam-view video,.cam-view canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#camStatus{font-size:.78rem;color:var(--muted);padding:0 2px}
+.cam-btns{display:flex;gap:6px}
+.cam-btns button{flex:1;border:1px solid var(--line);background:rgba(9,11,22,.7);border-radius:8px;padding:5px 4px;font-size:.72rem}
+.cam-btns button:hover{border-color:var(--cyan)}
+
+#countdown{position:fixed;inset:0;z-index:7;display:grid;place-items:center;pointer-events:none;font-family:var(--display);font-size:clamp(6rem,22vw,14rem);color:var(--text);text-shadow:0 0 60px var(--violet)}
+#countdown span{animation:pop .8s ease-out}
+@keyframes pop{from{transform:scale(1.7);opacity:0}30%{opacity:1}to{transform:scale(1)}}
+#hint{position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:7;padding:10px 18px;font-size:.95rem;text-align:center;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:30;padding:10px 18px;border-radius:12px;background:rgba(18,22,42,.95);border:1px solid var(--line);font-size:.9rem;pointer-events:none}
+#flash{position:fixed;inset:0;z-index:6;background:var(--coral);opacity:0;pointer-events:none;transition:opacity .35s}
+
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0 6px}
+.stat{padding:12px 14px;border-radius:14px;background:rgba(9,11,22,.6);border:1px solid var(--line)}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:1.5rem}
+.stat span{font-size:.78rem;color:var(--muted)}
+.final{font-family:var(--display);font-size:clamp(3rem,10vw,5rem);line-height:1;margin:8px 0;background:linear-gradient(100deg,var(--coral),var(--mango));-webkit-background-clip:text;background-clip:text;color:transparent}
+.newbest{display:inline-block;margin-top:4px;padding:6px 14px;border-radius:999px;background:var(--lime);color:#0b1a02;font-weight:700;font-size:.85rem;animation:pop .7s ease-out}
+input[type=range]{width:100%;accent-color:var(--violet)}
+
+@media (max-width:640px){
+  .cards{grid-template-columns:1fr}
+  .gcard{display:grid;grid-template-columns:90px 1fr;align-items:center;text-align:left;gap:10px}
+  .gcard svg{height:80px}
+  #cam{width:112px;padding:5px}
+  #camStatus,.cam-btns{display:none}
+  #gesture{min-width:0;font-size:.78rem;padding:8px 12px}
+  #bombBtn{min-width:0;font-size:.78rem}
+  #hud{grid-template-columns:auto 1fr auto}
+  .hud-l,.hud-c{min-width:0;padding:8px 12px}
+  .bestbox{display:none}
+  .menu-col{align-items:center;text-align:center;margin:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .cut line{stroke-dashoffset:0}
+}
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Game arena"></canvas>
+
+<!-- Landing -->
+<section id="menu" class="screen" aria-label="Main menu">
+  <div class="menu-col">
+    <h1 class="logo" aria-label="Gesture Fruit Ninja">
+      <span class="g">Gesture</span>
+      <span class="cut" aria-hidden="true"><span class="a">FRUIT NINJA</span><span class="b">FRUIT NINJA</span>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="-2" y1="66" x2="102" y2="34" pathLength="100"/></svg></span>
+    </h1>
+    <p class="tag">Your hand. Your blade. Endless fruit.</p>
+    <div class="cta">
+      <button id="btnPlay" class="btn primary big" data-autofocus>PLAY NOW</button>
+      <button id="btnHow" class="btn ghost big">HOW TO PLAY</button>
+    </div>
+    <div class="modes" role="radiogroup" aria-label="Game mode">
+      <button role="radio" data-mode="time" aria-checked="true">Time Attack</button>
+      <button role="radio" data-mode="zen" aria-checked="false">Zen</button>
+      <button role="radio" data-mode="endless" aria-checked="false">Endless</button>
+    </div>
+    <p id="modeDesc" class="modedesc" aria-live="polite"></p>
+    <div class="status-row">
+      <span class="chip">Camera <b id="menuCam">not started</b></span>
+      <span class="chip">Best <b id="menuBest">0</b></span>
+      <button id="btnSoundMenu" class="chip" aria-pressed="true">Sound on</button>
+    </div>
+    <button id="btnPointer" class="link">No camera? Play with mouse or touch</button>
+    <p class="privacy">Camera processing happens locally in your browser.</p>
+  </div>
+</section>
+
+<!-- How to play -->
+<div id="howto" class="overlay" role="dialog" aria-modal="true" aria-labelledby="howTitle" hidden>
+  <div class="panel">
+    <h2 id="howTitle">How to play</h2>
+    <p>Hold one hand up to your webcam. Three gestures are all you need.</p>
+    <div class="cards">
+      <div class="gcard a-point">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><path class="hand" d="M44 108V70c-8-4-10-14-4-18 5-3 10 0 12 4V24c0-6 10-6 10 0v38h4c8 0 18 4 18 14v32z"/><path class="glow" d="M28 14 L92 4"/></svg>
+        <div><h3>Point &amp; swipe</h3><p>Move your index finger through fruit to slice it.</p></div>
+      </div>
+      <div class="gcard a-fist">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="ring" cx="60" cy="55" r="40"/><path class="hand" d="M32 52c0-8 8-12 14-8 2-8 14-8 16 0 5-4 14-1 14 8 6-2 12 2 12 10v24c0 14-10 22-26 22H50c-14 0-22-10-22-24z"/></svg>
+        <div><h3>Make a fist</h3><p>Clear visible fruit with a powerful shockwave.</p></div>
+      </div>
+      <div class="gcard a-palm">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><path class="hand" d="M34 112V66l-8-18c-2-6 6-10 10-4l6 10V22c0-6 10-6 10 0v32V16c0-6 10-6 10 0v38V22c0-6 10-6 10 0v40l8-18c3-6 12-3 10 4l-8 28v32z"/></svg>
+        <div><h3>Open your palm</h3><p>Pause the action and take a break.</p></div>
+      </div>
+    </div>
+    <p>Bombs are black with a red ring. Cut one and you lose points. No hand showing never counts as a gesture.</p>
+    <div class="row">
+      <button id="howStart" class="btn primary" data-autofocus>START PLAYING</button>
+      <button id="howClose" class="btn ghost">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Camera setup / error -->
+<div id="setup" class="overlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle" hidden>
+  <div class="panel narrow">
+    <div id="setupSpin" aria-hidden="true"></div>
+    <h2 id="setupTitle">Starting camera</h2>
+    <p id="setupMsg" role="status">Allow camera access when your browser asks. Video stays on your device.</p>
+    <div class="stack">
+      <button id="btnRetry" class="btn primary" hidden>RETRY CAMERA</button>
+      <button id="btnSetupPointer" class="btn ghost" hidden>PLAY WITH MOUSE OR TOUCH</button>
+      <button id="btnSetupBack" class="btn ghost" data-autofocus>BACK TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calibration -->
+<div id="calib" class="overlay" role="dialog" aria-modal="true" aria-labelledby="calibTitle" hidden style="place-items:start center;background:rgba(9,11,22,.55)">
+  <div class="panel narrow">
+    <h2 id="calibTitle">Quick check</h2>
+    <p>Show each gesture to your camera. Each box ticks when it is detected.</p>
+    <ul class="checks">
+      <li data-g="INDEX_POINTING"><span class="box"></span><span>Point with your index finger</span></li>
+      <li data-g="FIST"><span class="box"></span><span>Make a fist</span></li>
+      <li data-g="OPEN_PALM"><span class="box"></span><span>Open your palm</span></li>
+    </ul>
+    <div class="detected">Detected now: <b id="calibNow">No hand</b></div>
+    <div class="row">
+      <button id="calibStart" class="btn primary" disabled>START ROUND</button>
+      <button id="calibSkip" class="btn ghost" data-autofocus>SKIP</button>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div class="hud-l glass"><div class="lbl">Score</div><div id="hScore" class="num">0</div><div id="hCombo" class="combo"></div></div>
+  <div class="hud-c glass"><div class="lbl" id="hTimeLbl">Time</div><div id="hTime" class="num">60</div><div class="bar"><i id="timeBar"></i></div><div id="lives" hidden></div></div>
+  <div class="hud-r">
+    <div class="glass bestbox"><div class="lbl">Best</div><b id="hBest">0</b></div>
+    <button id="btnSound" class="iconbtn" aria-label="Toggle sound" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="soundWave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+    <button id="btnPause" class="iconbtn" aria-label="Pause game"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+  </div>
+</div>
+<div id="hint" class="glass" hidden></div>
+<div id="hudBottom" hidden>
+  <div id="gesture" class="glass" aria-live="polite">&ndash; No hand detected</div>
+  <button id="bombBtn" aria-label="Bomb clear. Shortcut: B or make a fist"><i class="fill" id="bombFill"></i><span id="bombText">Bomb clear ready</span></button>
+</div>
+
+<!-- Camera panel -->
+<aside id="cam" class="glass" hidden aria-label="Camera">
+  <div id="camView" class="cam-view"><video id="video" playsinline muted autoplay></video><canvas id="camOverlay" width="160" height="120"></canvas></div>
+  <div id="camStatus" role="status">Waiting for camera</div>
+  <div class="cam-btns"><button id="btnHideCam">Hide preview</button><button id="btnStopCam">Stop camera</button></div>
+</aside>
+
+<div id="countdown" hidden aria-live="assertive"><span id="cdNum"></span></div>
+
+<!-- Pause -->
+<div id="pause" class="overlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+  <div class="panel narrow">
+    <h2 id="pauseTitle">PAUSED</h2>
+    <p>The clock, fruit and combo are frozen. Resume with the button.</p>
+    <div class="stack">
+      <button id="pResume" class="btn primary" data-autofocus>RESUME GAME</button>
+      <button id="pRestart" class="btn ghost">RESTART ROUND</button>
+      <button id="pFinish" class="btn ghost" hidden>FINISH RUN</button>
+      <button id="pMenu" class="btn ghost">RETURN TO MENU</button>
+      <button id="pSound" class="chip" aria-pressed="true" style="justify-content:center">Sound on</button>
+      <label class="lbl">Volume <input id="pVol" type="range" min="0" max="100" value="70"></label>
+    </div>
+  </div>
+</div>
+
+<!-- Game over -->
+<div id="over" class="overlay" role="dialog" aria-modal="true" aria-labelledby="overTitle" hidden>
+  <div class="panel narrow" style="text-align:center">
+    <h2 id="overTitle">Round over</h2>
+    <div class="final" id="oScore">0</div>
+    <span class="newbest" id="oNew" hidden>New personal best!</span>
+    <div class="stat-grid" style="text-align:left">
+      <div class="stat"><b id="oBest">0</b><span>Personal best</span></div>
+      <div class="stat"><b id="oSliced">0</b><span id="oSlicedLbl">Fruit sliced</span></div>
+      <div class="stat"><b id="oCombo">0</b><span>Best combo</span></div>
+      <div class="stat"><b id="oCleared">0</b><span>Bomb-cleared fruit</span></div>
+    </div>
+    <div class="stack">
+      <button id="oAgain" class="btn primary" data-autofocus>PLAY AGAIN</button>
+      <button id="oMenu" class="btn ghost">BACK TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="toast" role="status" hidden></div>
+
+<script type="module" src="./src/main.js"></script>
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center">This game needs JavaScript.</p></noscript>
+</body>
+</html>
