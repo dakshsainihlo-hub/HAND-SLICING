@@ -1,0 +1,1555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gesture Fruit Ninja</title>
+<meta name="description" content="Slice fruit with your index finger. Webcam hand tracking runs locally in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#090B16; --bg2:#12162A; --violet:#8B5CF6; --cyan:#22D3EE; --coral:#FF4D6D; --mango:#FFAA33; --lime:#A3E635;
+  --text:#F8FAFC; --muted:#A7B0C5; --line:rgba(167,176,197,.18);
+  --display:'Bungee',Impact,'Arial Black',sans-serif;
+  --ui:'Sora',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);overflow:hidden;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--cyan);outline-offset:3px;border-radius:10px}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- buttons ---------- */
+.btn{border:0;border-radius:14px;padding:14px 24px;font-family:var(--display);font-size:1rem;letter-spacing:.02em;transition:transform .12s,box-shadow .2s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(135deg,var(--coral),var(--mango));color:#1a0b10;box-shadow:0 10px 30px -8px rgba(255,77,109,.7)}
+.btn.primary:hover{box-shadow:0 14px 36px -6px rgba(255,170,51,.75)}
+.btn.ghost{background:rgba(18,22,42,.7);border:1px solid var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--cyan)}
+.btn.big{padding:18px 34px;font-size:1.2rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;text-underline-offset:4px;padding:6px 0;font-size:.9rem}
+.link:hover{color:var(--text)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(18,22,42,.78);border:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+.chip b{color:var(--text)}
+button.chip:hover{border-color:var(--cyan);color:var(--text)}
+.iconbtn{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(18,22,42,.78);display:grid;place-items:center;backdrop-filter:blur(8px)}
+.iconbtn:hover{border-color:var(--cyan)}
+.iconbtn svg{width:22px;height:22px;stroke:var(--text);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.glass{background:rgba(18,22,42,.62);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+
+/* ---------- landing ---------- */
+.screen{position:fixed;inset:0;display:flex;align-items:center;z-index:5;pointer-events:none}
+.screen > *{pointer-events:auto}
+#menu{padding:clamp(20px,6vw,90px)}
+.menu-col{max-width:640px;display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+.logo{margin:0;line-height:.92;display:flex;flex-direction:column;gap:6px}
+.logo .g{font-family:var(--ui);font-weight:700;font-size:clamp(1.1rem,3vw,1.7rem);color:var(--cyan);letter-spacing:.34em;text-transform:uppercase}
+.cut{position:relative;display:inline-block;font-family:var(--display);font-size:clamp(3rem,11vw,7.6rem);white-space:nowrap}
+.cut .a,.cut .b{display:block;background:linear-gradient(100deg,var(--coral),var(--mango) 55%,var(--lime));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 8px 28px rgba(255,77,109,.35))}
+.cut .a{clip-path:polygon(0 0,100% 0,100% 30%,0 62%);transform:translate(-5px,-6px)}
+.cut .b{position:absolute;inset:0;clip-path:polygon(0 70%,100% 38%,100% 100%,0 100%);transform:translate(5px,6px)}
+.cut svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.cut line{stroke:var(--cyan);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linecap:round}
+.tag{margin:0;font-size:clamp(1.05rem,2.4vw,1.4rem);color:var(--text)}
+.cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.modes{display:flex;gap:6px;padding:5px;border-radius:14px;background:rgba(18,22,42,.7);border:1px solid var(--line)}
+.modes button{border:0;background:none;padding:9px 16px;border-radius:10px;color:var(--muted);font-weight:600;font-size:.9rem}
+.modes button[aria-checked="true"]{background:var(--violet);color:#fff}
+.modedesc{margin:0;color:var(--muted);font-size:.92rem;min-height:1.4em}
+.status-row{display:flex;gap:10px;flex-wrap:wrap}
+.privacy{margin:0;color:var(--muted);font-size:.8rem}
+
+/* ---------- panels / overlays ---------- */
+.overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:rgba(9,11,22,.72);backdrop-filter:blur(6px)}
+.panel{width:min(760px,100%);max-height:calc(100% - 20px);overflow:auto;padding:clamp(20px,4vw,36px);border-radius:24px;background:linear-gradient(180deg,rgba(26,31,58,.96),rgba(18,22,42,.96));border:1px solid var(--line);box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.panel.narrow{width:min(460px,100%)}
+.panel h2{margin:0 0 6px;font-family:var(--display);font-weight:400;font-size:clamp(1.6rem,4.5vw,2.3rem)}
+.panel p{color:var(--muted);line-height:1.55}
+.panel .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.panel .stack{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0}
+.gcard{padding:16px;border-radius:18px;background:rgba(9,11,22,.6);border:1px solid var(--line);text-align:center}
+.gcard svg{width:100%;max-width:120px;height:110px}
+.gcard h3{margin:8px 0 4px;font-family:var(--display);font-weight:400;font-size:1.05rem}
+.gcard p{margin:0;font-size:.85rem}
+.hand{fill:#1c2142;stroke:var(--text);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.glow{stroke:var(--cyan);stroke-width:4;fill:none;stroke-linecap:round;filter:drop-shadow(0 0 6px var(--cyan))}
+.a-point .glow{stroke-dasharray:40;animation:sweep 1.6s ease-in-out infinite}
+@keyframes sweep{0%{stroke-dashoffset:40;opacity:0}30%{opacity:1}100%{stroke-dashoffset:-40;opacity:0}}
+.a-fist .ring{fill:none;stroke:var(--coral);stroke-width:3;transform-origin:60px 55px;animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.4);opacity:0}}
+.a-palm .hand{animation:bob 2s ease-in-out infinite;transform-origin:60px 100px}
+@keyframes bob{50%{transform:rotate(4deg)}}
+
+#setupSpin{width:38px;height:38px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--cyan);animation:spin 1s linear infinite;margin:8px 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.checks{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px}
+.checks li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(9,11,22,.6);border:1px solid var(--line)}
+.checks .box{width:26px;height:26px;border-radius:8px;border:2px solid var(--muted);display:grid;place-items:center;font-weight:700;color:transparent}
+.checks li.done{border-color:var(--lime)}
+.checks li.done .box{background:var(--lime);border-color:var(--lime);color:#0b1a02}
+.checks li.done .box::after{content:"\2713"}
+.detected{margin-top:14px;font-size:.9rem;color:var(--muted)}
+.detected b{color:var(--text)}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0 0 auto 0;z-index:8;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;padding:max(12px,env(safe-area-inset-top)) 14px 0;pointer-events:none}
+#hud > *{pointer-events:auto}
+.hud-l{justify-self:start;padding:10px 18px;min-width:130px}
+.hud-c{justify-self:center;padding:10px 22px;text-align:center;min-width:130px}
+.hud-r{justify-self:end;display:flex;gap:8px;align-items:flex-start}
+.lbl{font-size:.72rem;color:var(--muted)}
+.num{font-family:var(--display);font-size:clamp(1.5rem,4vw,2.2rem);line-height:1.05}
+.combo{font-family:var(--display);color:var(--mango);font-size:.95rem;min-height:1.1em}
+.bar{height:5px;border-radius:5px;background:rgba(167,176,197,.2);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transform-origin:left;transition:transform .2s linear}
+.bestbox{padding:6px 14px;text-align:right}
+.bestbox b{font-family:var(--display);font-size:1.1rem;font-weight:400}
+#lives{font-size:.8rem;color:var(--coral);margin-top:4px}
+
+#hudBottom{position:fixed;right:14px;bottom:max(14px,env(safe-area-inset-bottom));z-index:8;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+#gesture{padding:10px 16px;font-size:.88rem;font-weight:600;min-width:190px}
+#bombBtn{position:relative;overflow:hidden;padding:10px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(18,22,42,.78);font-weight:600;font-size:.88rem;min-width:170px;text-align:left}
+#bombBtn .fill{position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,77,109,.55),rgba(255,170,51,.55));transform-origin:left;transform:scaleX(0);transition:transform .15s linear}
+#bombBtn span{position:relative}
+#bombBtn.ready{border-color:var(--mango)}
+
+#cam{position:fixed;left:14px;bottom:max(14px,env(safe-area-inset-bottom));z-index:9;width:196px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.cam-view{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#000;transform:scaleX(-1)}
+.cam-view.off{opacity:0;height:1px;aspect-ratio:auto}
+.cam-view video,.cam-view canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#camStatus{font-size:.78rem;color:var(--muted);padding:0 2px}
+.cam-btns{display:flex;gap:6px}
+.cam-btns button{flex:1;border:1px solid var(--line);background:rgba(9,11,22,.7);border-radius:8px;padding:5px 4px;font-size:.72rem}
+.cam-btns button:hover{border-color:var(--cyan)}
+
+#countdown{position:fixed;inset:0;z-index:7;display:grid;place-items:center;pointer-events:none;font-family:var(--display);font-size:clamp(6rem,22vw,14rem);color:var(--text);text-shadow:0 0 60px var(--violet)}
+#countdown span{animation:pop .8s ease-out}
+@keyframes pop{from{transform:scale(1.7);opacity:0}30%{opacity:1}to{transform:scale(1)}}
+#hint{position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:7;padding:10px 18px;font-size:.95rem;text-align:center;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:30;padding:10px 18px;border-radius:12px;background:rgba(18,22,42,.95);border:1px solid var(--line);font-size:.9rem;pointer-events:none}
+#flash{position:fixed;inset:0;z-index:6;background:var(--coral);opacity:0;pointer-events:none;transition:opacity .35s}
+
+.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:18px 0 6px}
+.stat{padding:12px 14px;border-radius:14px;background:rgba(9,11,22,.6);border:1px solid var(--line)}
+.stat b{display:block;font-family:var(--display);font-weight:400;font-size:1.5rem}
+.stat span{font-size:.78rem;color:var(--muted)}
+.final{font-family:var(--display);font-size:clamp(3rem,10vw,5rem);line-height:1;margin:8px 0;background:linear-gradient(100deg,var(--coral),var(--mango));-webkit-background-clip:text;background-clip:text;color:transparent}
+.newbest{display:inline-block;margin-top:4px;padding:6px 14px;border-radius:999px;background:var(--lime);color:#0b1a02;font-weight:700;font-size:.85rem;animation:pop .7s ease-out}
+input[type=range]{width:100%;accent-color:var(--violet)}
+
+@media (max-width:640px){
+  .cards{grid-template-columns:1fr}
+  .gcard{display:grid;grid-template-columns:90px 1fr;align-items:center;text-align:left;gap:10px}
+  .gcard svg{height:80px}
+  #cam{width:112px;padding:5px}
+  #camStatus,.cam-btns{display:none}
+  #gesture{min-width:0;font-size:.78rem;padding:8px 12px}
+  #bombBtn{min-width:0;font-size:.78rem}
+  #hud{grid-template-columns:auto 1fr auto}
+  .hud-l,.hud-c{min-width:0;padding:8px 12px}
+  .bestbox{display:none}
+  .menu-col{align-items:center;text-align:center;margin:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Game arena"></canvas>
+
+<!-- Landing -->
+<section id="menu" class="screen" aria-label="Main menu">
+  <div class="menu-col">
+    <h1 class="logo" aria-label="Gesture Fruit Ninja">
+      <span class="g">Gesture</span>
+      <span class="cut" aria-hidden="true"><span class="a">FRUIT NINJA</span><span class="b">FRUIT NINJA</span>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="-2" y1="66" x2="102" y2="34" pathLength="100"/></svg></span>
+    </h1>
+    <p class="tag">Your hand. Your blade. Endless fruit.</p>
+    <div class="cta">
+      <button id="btnPlay" class="btn primary big" data-autofocus>PLAY NOW</button>
+      <button id="btnHow" class="btn ghost big">HOW TO PLAY</button>
+    </div>
+    <div class="modes" role="radiogroup" aria-label="Game mode">
+      <button role="radio" data-mode="time" aria-checked="true">Time Attack</button>
+      <button role="radio" data-mode="zen" aria-checked="false">Zen</button>
+      <button role="radio" data-mode="endless" aria-checked="false">Endless</button>
+    </div>
+    <p id="modeDesc" class="modedesc" aria-live="polite"></p>
+    <div class="status-row">
+      <span class="chip">Camera <b id="menuCam">not started</b></span>
+      <span class="chip">Best <b id="menuBest">0</b></span>
+      <button id="btnSoundMenu" class="chip" aria-pressed="true">Sound on</button>
+    </div>
+    <button id="btnPointer" class="link">No camera? Play with mouse or touch</button>
+    <p class="privacy">Camera processing happens locally in your browser.</p>
+  </div>
+</section>
+
+<!-- How to play -->
+<div id="howto" class="overlay" role="dialog" aria-modal="true" aria-labelledby="howTitle" hidden>
+  <div class="panel">
+    <h2 id="howTitle">How to play</h2>
+    <p>Hold one hand up to your webcam. Three gestures are all you need.</p>
+    <div class="cards">
+      <div class="gcard a-point">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><path class="hand" d="M44 108V70c-8-4-10-14-4-18 5-3 10 0 12 4V24c0-6 10-6 10 0v38h4c8 0 18 4 18 14v32z"/><path class="glow" d="M28 14 L92 4"/></svg>
+        <div><h3>Point &amp; swipe</h3><p>Move your index finger through fruit to slice it.</p></div>
+      </div>
+      <div class="gcard a-fist">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="ring" cx="60" cy="55" r="40"/><path class="hand" d="M32 52c0-8 8-12 14-8 2-8 14-8 16 0 5-4 14-1 14 8 6-2 12 2 12 10v24c0 14-10 22-26 22H50c-14 0-22-10-22-24z"/></svg>
+        <div><h3>Make a fist</h3><p>Clear visible fruit with a powerful shockwave.</p></div>
+      </div>
+      <div class="gcard a-palm">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><path class="hand" d="M34 112V66l-8-18c-2-6 6-10 10-4l6 10V22c0-6 10-6 10 0v32V16c0-6 10-6 10 0v38V22c0-6 10-6 10 0v40l8-18c3-6 12-3 10 4l-8 28v32z"/></svg>
+        <div><h3>Open your palm</h3><p>Pause the action and take a break.</p></div>
+      </div>
+    </div>
+    <p>Bombs are black with a red ring. Cut one and you lose points. No hand showing never counts as a gesture.</p>
+    <div class="row">
+      <button id="howStart" class="btn primary" data-autofocus>START PLAYING</button>
+      <button id="howClose" class="btn ghost">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Camera setup / error -->
+<div id="setup" class="overlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle" hidden>
+  <div class="panel narrow">
+    <div id="setupSpin" aria-hidden="true"></div>
+    <h2 id="setupTitle">Starting camera</h2>
+    <p id="setupMsg" role="status">Allow camera access when your browser asks. Video stays on your device.</p>
+    <div class="stack">
+      <button id="btnRetry" class="btn primary" hidden>RETRY CAMERA</button>
+      <button id="btnSetupPointer" class="btn ghost" hidden>PLAY WITH MOUSE OR TOUCH</button>
+      <button id="btnSetupBack" class="btn ghost" data-autofocus>BACK TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calibration -->
+<div id="calib" class="overlay" role="dialog" aria-modal="true" aria-labelledby="calibTitle" hidden style="place-items:start center;background:rgba(9,11,22,.55)">
+  <div class="panel narrow">
+    <h2 id="calibTitle">Quick check</h2>
+    <p>Show each gesture to your camera. Each box ticks when it is detected.</p>
+    <ul class="checks">
+      <li data-g="INDEX_POINTING"><span class="box"></span><span>Point with your index finger</span></li>
+      <li data-g="FIST"><span class="box"></span><span>Make a fist</span></li>
+      <li data-g="OPEN_PALM"><span class="box"></span><span>Open your palm</span></li>
+    </ul>
+    <div class="detected">Detected now: <b id="calibNow">No hand</b></div>
+    <div class="row">
+      <button id="calibStart" class="btn primary" disabled>START ROUND</button>
+      <button id="calibSkip" class="btn ghost" data-autofocus>SKIP</button>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div class="hud-l glass"><div class="lbl">Score</div><div id="hScore" class="num">0</div><div id="hCombo" class="combo"></div></div>
+  <div class="hud-c glass"><div class="lbl" id="hTimeLbl">Time</div><div id="hTime" class="num">60</div><div class="bar"><i id="timeBar"></i></div><div id="lives" hidden></div></div>
+  <div class="hud-r">
+    <div class="glass bestbox"><div class="lbl">Best</div><b id="hBest">0</b></div>
+    <button id="btnSound" class="iconbtn" aria-label="Toggle sound" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="soundWave" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></button>
+    <button id="btnPause" class="iconbtn" aria-label="Pause game"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+  </div>
+</div>
+<div id="hint" class="glass" hidden></div>
+<div id="hudBottom" hidden>
+  <div id="gesture" class="glass" aria-live="polite">&ndash; No hand detected</div>
+  <button id="bombBtn" aria-label="Bomb clear. Shortcut: B or make a fist"><i class="fill" id="bombFill"></i><span id="bombText">Bomb clear ready</span></button>
+</div>
+
+<!-- Camera panel -->
+<aside id="cam" class="glass" hidden aria-label="Camera">
+  <div id="camView" class="cam-view"><video id="video" playsinline muted autoplay></video><canvas id="camOverlay" width="160" height="120"></canvas></div>
+  <div id="camStatus" role="status">Waiting for camera</div>
+  <div class="cam-btns"><button id="btnHideCam">Hide preview</button><button id="btnStopCam">Stop camera</button></div>
+</aside>
+
+<div id="countdown" hidden aria-live="assertive"><span id="cdNum"></span></div>
+
+<!-- Pause -->
+<div id="pause" class="overlay" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+  <div class="panel narrow">
+    <h2 id="pauseTitle">PAUSED</h2>
+    <p>The clock, fruit and combo are frozen. Resume with the button.</p>
+    <div class="stack">
+      <button id="pResume" class="btn primary" data-autofocus>RESUME GAME</button>
+      <button id="pRestart" class="btn ghost">RESTART ROUND</button>
+      <button id="pFinish" class="btn ghost" hidden>FINISH RUN</button>
+      <button id="pMenu" class="btn ghost">RETURN TO MENU</button>
+      <button id="pSound" class="chip" aria-pressed="true" style="justify-content:center">Sound on</button>
+      <label class="lbl">Volume <input id="pVol" type="range" min="0" max="100" value="70"></label>
+    </div>
+  </div>
+</div>
+
+<!-- Game over -->
+<div id="over" class="overlay" role="dialog" aria-modal="true" aria-labelledby="overTitle" hidden>
+  <div class="panel narrow" style="text-align:center">
+    <h2 id="overTitle">Round over</h2>
+    <div class="final" id="oScore">0</div>
+    <span class="newbest" id="oNew" hidden>New personal best!</span>
+    <div class="stat-grid" style="text-align:left">
+      <div class="stat"><b id="oBest">0</b><span>Personal best</span></div>
+      <div class="stat"><b id="oSliced">0</b><span id="oSlicedLbl">Fruit sliced</span></div>
+      <div class="stat"><b id="oCombo">0</b><span>Best combo</span></div>
+      <div class="stat"><b id="oCleared">0</b><span>Bomb-cleared fruit</span></div>
+    </div>
+    <div class="stack">
+      <button id="oAgain" class="btn primary" data-autofocus>PLAY AGAIN</button>
+      <button id="oMenu" class="btn ghost">BACK TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="boot" role="alert" style="position:fixed;inset:auto 16px 16px 16px;z-index:99;padding:14px 18px;border-radius:12px;background:#12162A;border:1px solid #FF4D6D;color:#F8FAFC;font-size:.95rem;opacity:0;animation:bootshow .01s 1.5s forwards">
+  The game script did not start. Open this file in desktop Chrome or Edge (not a chat preview), and check that JavaScript is enabled. If it still fails, press F12 and send the red error text.</div>
+<style>@keyframes bootshow{to{opacity:1}}</style>
+<div id="flash"></div>
+<div id="toast" role="status" hidden></div>
+
+<script type="module">
+// Pure logic with no DOM access, so it can be unit-tested in Node.
+// Everything tunable lives in CONFIG / MODES, with the reasoning next to each value.
+
+const CONFIG = {
+  gesture: {
+    // Finger extension is measured as dist(tip, wrist) / dist(knuckle, wrist).
+    // A straight finger puts the tip ~1.8-2.1x as far from the wrist as its knuckle;
+    // a curled finger folds the tip back to ~0.7-1.3x. Using a ratio (not pixels)
+    // makes it independent of hand size, camera distance and hand rotation.
+    extendedRatio: 1.6,
+    foldedRatio: 1.4,
+    // Open palm also needs spread fingers: dist(indexTip, pinkyTip) / knuckle width.
+    // Closed-together straight fingers measure ~1.0, an open hand ~1.5+.
+    palmSpread: 1.15,
+    // Consecutive frames a gesture must hold before it is "confirmed".
+    // Fist/palm trigger actions, so they need more proof than pointing.
+    stableFrames: { NO_HAND: 5, INDEX_POINTING: 2, OTHER_GESTURE: 3, FIST: 4, OPEN_PALM: 7 },
+    // Raw pointing frames required before the blade becomes active (re-arming).
+    armFrames: 3,
+  },
+  map: {
+    mirror: true, // selfie view: moving your hand right moves the blade right
+    margin: 0.1, // use the central 80% of the camera frame so screen edges are reachable
+  },
+  smoothing: {
+    minAlpha: 0.35, // slow movement: heavy smoothing to hide landmark jitter
+    maxAlpha: 0.95, // fast swipes: almost no smoothing so the blade never lags
+    speedGain: 0.4, // alpha rises with speed (screen-diagonals per second)
+    jumpLimit: 0.5, // a jump bigger than half the diagonal in one sample is a tracking glitch
+  },
+  score: {
+    comboWindow: 1.0, // seconds between slices that keep a combo alive
+    swipeBonus: 3, // per extra fruit once 3+ are cut in a single swipe
+    bombPenalty: 15,
+    bombClearPerFruit: 5,
+    multiplierEvery: 5, // combo steps per multiplier level
+    maxMultiplier: 4,
+  },
+  bombCooldown: 8, // seconds between bomb-clear charges
+  inferFps: 30,
+};
+
+const MODES = {
+  time: {
+    id: 'time', name: 'Time Attack', duration: 60, bombs: true, gravity: 1, interval: 1, lives: null,
+    desc: '60 seconds. Waves speed up. Bombs cost points.',
+  },
+  zen: {
+    id: 'zen', name: 'Zen', duration: 120, bombs: false, gravity: 0.75, interval: 1.35, lives: null,
+    desc: 'Two relaxed minutes. Slower fruit, no bombs.',
+  },
+  endless: {
+    id: 'endless', name: 'Endless', duration: null, bombs: true, gravity: 1, interval: 1, lives: 3,
+    desc: 'No clock. Three bomb hits end the run.',
+  },
+};
+
+const FRUIT_TYPES = ['watermelon', 'orange', 'apple', 'strawberry', 'pineapple', 'lemon', 'peach', 'coconut'];
+const FRUIT_POINTS = {
+  watermelon: 3, orange: 2, apple: 2, strawberry: 4, pineapple: 5, lemon: 3, peach: 3, coconut: 6,
+};
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// ---------------------------------------------------------------- gestures
+const FINGERS = [[5, 8], [9, 12], [13, 16], [17, 20]]; // [knuckle, tip] for index, middle, ring, pinky
+
+function fingerRatio(lm, knuckle, tip) {
+  return dist(lm[tip], lm[0]) / Math.max(1e-6, dist(lm[knuckle], lm[0]));
+}
+
+/** Classify 21 MediaPipe hand landmarks. Returns { gesture, ratios, indexExtended }. */
+function classifyHand(lm, cfg = CONFIG.gesture) {
+  if (!lm || lm.length < 21) return { gesture: 'NO_HAND', ratios: [], indexExtended: false };
+  const ratios = FINGERS.map(([k, t]) => fingerRatio(lm, k, t));
+  const ext = ratios.map((r) => r >= cfg.extendedRatio);
+  const fold = ratios.map((r) => r < cfg.foldedRatio);
+  const knuckleWidth = Math.max(1e-6, dist(lm[5], lm[17]));
+  const spread = dist(lm[8], lm[20]) / knuckleWidth;
+  let gesture = 'OTHER_GESTURE';
+  if (ext.every(Boolean)) {
+    gesture = spread >= cfg.palmSpread ? 'OPEN_PALM' : 'OTHER_GESTURE';
+  } else if (ext[0] && fold[1] && fold[2] && fold[3]) {
+    gesture = 'INDEX_POINTING';
+  } else if (fold.every(Boolean)) {
+    gesture = 'FIST';
+  }
+  return { gesture, ratios, indexExtended: ext[0] };
+}
+
+/** Debounces raw per-frame gestures. `entered` is set only on the frame a new gesture is confirmed. */
+class GestureStabilizer {
+  constructor(frames = CONFIG.gesture.stableFrames) {
+    this.frames = frames;
+    this.reset();
+  }
+  reset() {
+    this.stable = 'NO_HAND';
+    this.candidate = 'NO_HAND';
+    this.count = 0;
+  }
+  update(raw) {
+    if (raw === this.candidate) this.count++;
+    else { this.candidate = raw; this.count = 1; }
+    let entered = null;
+    if (this.candidate !== this.stable && this.count >= (this.frames[this.candidate] ?? 3)) {
+      this.stable = this.candidate;
+      entered = this.candidate;
+    }
+    return { stable: this.stable, entered };
+  }
+}
+
+// ---------------------------------------------------------------- coordinates
+/** Normalised landmark (0-1, camera space) -> arena pixels, with mirroring and edge margin. */
+function mapToArena(p, w, h, cfg = CONFIG.map) {
+  let x = cfg.mirror ? 1 - p.x : p.x;
+  let y = p.y;
+  const span = 1 - 2 * cfg.margin;
+  x = clamp((x - cfg.margin) / span, 0, 1);
+  y = clamp((y - cfg.margin) / span, 0, 1);
+  return { x: x * w, y: y * h };
+}
+
+/** Speed-adaptive exponential smoothing with glitch rejection. */
+class PointSmoother {
+  constructor(cfg = CONFIG.smoothing) { this.cfg = cfg; this.last = null; this.lastT = 0; }
+  reset() { this.last = null; }
+  update(p, tMs, w, h) {
+    const diag = Math.hypot(w, h);
+    if (!this.last) { this.last = { x: p.x, y: p.y }; this.lastT = tMs; return { x: p.x, y: p.y, jumped: true }; }
+    const dt = Math.max(0.001, (tMs - this.lastT) / 1000);
+    const d = Math.hypot(p.x - this.last.x, p.y - this.last.y);
+    this.lastT = tMs;
+    if (d / diag > this.cfg.jumpLimit) { // implausible jump: re-seed, caller must not draw/slice across it
+      this.last = { x: p.x, y: p.y };
+      return { x: p.x, y: p.y, jumped: true };
+    }
+    const speed = d / diag / dt;
+    const a = clamp(this.cfg.minAlpha + speed * this.cfg.speedGain, this.cfg.minAlpha, this.cfg.maxAlpha);
+    this.last = { x: this.last.x + (p.x - this.last.x) * a, y: this.last.y + (p.y - this.last.y) * a };
+    return { x: this.last.x, y: this.last.y, jumped: false };
+  }
+}
+
+// ---------------------------------------------------------------- collision
+/** Swept test: does segment A->B come within r of circle centre C? Catches fast swipes. */
+function segmentHitsCircle(ax, ay, bx, by, cx, cy, r) {
+  const dx = bx - ax, dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  let t = len2 === 0 ? 0 : ((cx - ax) * dx + (cy - ay) * dy) / len2;
+  t = clamp(t, 0, 1);
+  const px = ax + dx * t, py = ay + dy * t;
+  return (cx - px) ** 2 + (cy - py) ** 2 <= r * r;
+}
+
+// ---------------------------------------------------------------- scoring
+class ScoreManager {
+  constructor(cfg = CONFIG.score) { this.cfg = cfg; this.reset(); }
+  reset() {
+    this.score = 0; this.combo = 0; this.bestCombo = 0; this.sliced = 0;
+    this.lastSliceT = -Infinity; this.swipe = -1; this.swipeCount = 0;
+  }
+  multiplier() {
+    return Math.min(this.cfg.maxMultiplier, 1 + Math.floor(this.combo / this.cfg.multiplierEvery));
+  }
+  /** Call exactly once per sliced fruit. */
+  slice(base, t, swipeId) {
+    if (t - this.lastSliceT > this.cfg.comboWindow) this.combo = 0;
+    this.combo++;
+    this.lastSliceT = t;
+    this.bestCombo = Math.max(this.bestCombo, this.combo);
+    if (swipeId !== this.swipe) { this.swipe = swipeId; this.swipeCount = 0; }
+    this.swipeCount++;
+    const swipeBonus = this.swipeCount >= 3 ? this.cfg.swipeBonus * (this.swipeCount - 2) : 0;
+    const mult = this.multiplier();
+    const pts = base * mult + swipeBonus;
+    this.score += pts;
+    this.sliced++;
+    return { pts, combo: this.combo, mult, swipeCount: this.swipeCount, swipeBonus };
+  }
+  expire(t) { if (t - this.lastSliceT > this.cfg.comboWindow) this.combo = 0; }
+  breakCombo() { this.combo = 0; }
+  add(n) { this.score += n; }
+  penalty(n) { this.score = Math.max(0, this.score - n); }
+}
+
+/** One bomb-clear charge with a visible cooldown. Time is game time, so pausing freezes it. */
+class BombCharge {
+  constructor(cooldown = CONFIG.bombCooldown) { this.cooldown = cooldown; this.remaining = 0; }
+  reset() { this.remaining = 0; }
+  update(dt) { this.remaining = Math.max(0, this.remaining - dt); }
+  get ready() { return this.remaining <= 0; }
+  get progress() { return 1 - this.remaining / this.cooldown; }
+  tryUse() {
+    if (!this.ready) return false;
+    this.remaining = this.cooldown;
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------- state machine
+const TRANSITIONS = {
+  MENU: ['SETUP', 'COUNTDOWN'],
+  SETUP: ['CALIBRATING', 'COUNTDOWN', 'MENU', 'ERROR'],
+  ERROR: ['SETUP', 'MENU', 'COUNTDOWN'],
+  CALIBRATING: ['COUNTDOWN', 'MENU', 'ERROR'],
+  COUNTDOWN: ['PLAYING', 'MENU', 'ERROR'],
+  PLAYING: ['PAUSED', 'GAME_OVER', 'MENU', 'COUNTDOWN', 'ERROR'],
+  PAUSED: ['PLAYING', 'COUNTDOWN', 'MENU', 'GAME_OVER', 'ERROR'],
+  GAME_OVER: ['COUNTDOWN', 'MENU', 'SETUP'],
+};
+
+class StateMachine {
+  constructor(initial = 'MENU', onChange = () => {}) { this.state = initial; this.onChange = onChange; }
+  can(next) { return (TRANSITIONS[this.state] || []).includes(next); }
+  go(next) {
+    if (!this.can(next)) return false;
+    const prev = this.state;
+    this.state = next;
+    this.onChange(next, prev);
+    return true;
+  }
+}
+
+// ---------------------------------------------------------------- storage
+const SAVE_KEY = 'gesture-fruit-ninja:v1';
+const defaultSave = () => ({
+  best: { time: 0, zen: 0, endless: 0 }, calibrated: false, sound: true, volume: 0.7, hintSeen: false,
+});
+
+function loadSave(storage) {
+  const base = defaultSave();
+  try {
+    const raw = storage && storage.getItem(SAVE_KEY);
+    if (!raw) return base;
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return base;
+    for (const k of Object.keys(base.best)) if (Number.isFinite(o.best?.[k])) base.best[k] = Math.max(0, o.best[k]);
+    if (typeof o.calibrated === 'boolean') base.calibrated = o.calibrated;
+    if (typeof o.sound === 'boolean') base.sound = o.sound;
+    if (typeof o.hintSeen === 'boolean') base.hintSeen = o.hintSeen;
+    if (Number.isFinite(o.volume)) base.volume = clamp(o.volume, 0, 1);
+    return base;
+  } catch { return base; }
+}
+
+function writeSave(storage, data) {
+  try { storage.setItem(SAVE_KEY, JSON.stringify(data)); return true; } catch { return false; }
+}
+
+// ---------------------------------------------------------------- camera helpers
+function classifyCameraError(err) {
+  const name = err && err.name;
+  if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'PermissionDeniedError') {
+    return { code: 'denied', message: 'Camera permission was blocked. Allow camera access in the address bar, then retry. Webcams only work on HTTPS or localhost.' };
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') {
+    return { code: 'missing', message: 'No usable camera was found. Plug one in, or play with mouse or touch.' };
+  }
+  if (name === 'NotReadableError' || name === 'AbortError' || name === 'TrackStartError') {
+    return { code: 'busy', message: 'The camera is in use by another app. Close it and retry.' };
+  }
+  if (err && err.code === 'unsupported') {
+    return { code: 'unsupported', message: 'This browser cannot access a camera here. Use HTTPS or localhost, or play with mouse or touch.' };
+  }
+  if (err && err.code === 'model') {
+    return { code: 'model', message: 'The hand-tracking model could not load. Check your connection and retry.' };
+  }
+  return { code: 'unknown', message: 'The camera could not start. Retry, or play with mouse or touch.' };
+}
+
+function releaseStream(stream) {
+  if (!stream) return 0;
+  let n = 0;
+  for (const t of stream.getTracks()) { try { t.stop(); n++; } catch { /* ignore */ } }
+  return n;
+}
+
+
+/* =====================================================================
+   Config: MediaPipe runtime and model are pinned. The model is tried from
+   ./models first (offline), then the official Google bucket.
+   ===================================================================== */
+const MP_VERSION = '0.10.14';
+const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
+const MODEL_URLS = [
+  './models/hand_landmarker.task',
+  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+];
+
+const $ = (id) => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const rand = (a, b) => a + Math.random() * (b - a);
+
+/* ---------------- persistence ---------------- */
+let storage = null;
+try { storage = window.localStorage; } catch { storage = null; }
+const save = loadSave(storage);
+const persist = () => writeSave(storage, save);
+
+/* ---------------- state ---------------- */
+let inputMode = 'camera'; // 'camera' | 'pointer'
+let modeId = 'time';
+const sm = new StateMachine('MENU', (s) => applyState(s));
+const score = new ScoreManager();
+const bomb = new BombCharge();
+const stab = new GestureStabilizer();
+const smoother = new PointSmoother();
+
+const game = {
+  mode: MODES.time, elapsed: 0, remaining: 60, fruits: [], halves: [], queue: [], waveT: 0.6,
+  launched: 0, cleared: 0, bombHits: 0, finishing: false, finishT: 0, nextId: 1, countT: 0, countN: 3,
+};
+const blade = { last: null, lastT: 0, swipe: 0, armFrames: 0, trail: [] };
+const fx = { shake: 0, slow: 0, shockwaves: [], flash: 0 };
+let W = 0, H = 0, DPR = 1, quality = 1, displayScore = 0;
+
+/* =====================================================================
+   Audio: procedural Web Audio, created only after a user gesture.
+   ===================================================================== */
+const audio = {
+  ctx: null, master: null, noiseBuf: null, enabled: save.sound, vol: save.volume,
+  unlock() {
+    if (!this.ctx) {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.master.gain.value = this.vol;
+        this.master.connect(this.ctx.destination);
+      } catch { this.ctx = null; }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+  },
+  setVol(v) { this.vol = v; if (this.master) this.master.gain.value = v; },
+  tone(f, d, { type = 'sine', vol = 0.2, to = null, delay = 0 } = {}) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const t0 = this.ctx.currentTime + delay;
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t0);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t0 + d);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      o.connect(g); g.connect(this.master); o.start(t0); o.stop(t0 + d + 0.02);
+    } catch { /* never crash gameplay on audio */ }
+  },
+  noise(d, { vol = 0.2, freq = 1500, to = null, q = 0.8, delay = 0, type = 'bandpass' } = {}) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      if (!this.noiseBuf) {
+        const n = this.ctx.sampleRate;
+        this.noiseBuf = this.ctx.createBuffer(1, n, n);
+        const ch = this.noiseBuf.getChannelData(0);
+        for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+      }
+      const t0 = this.ctx.currentTime + delay;
+      const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
+      const f = this.ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(freq, t0);
+      if (to) f.frequency.exponentialRampToValueAtTime(to, t0 + d);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+      s.connect(f); f.connect(g); g.connect(this.master); s.start(t0, Math.random() * 0.5); s.stop(t0 + d + 0.02);
+    } catch { /* ignore */ }
+  },
+  ui() { this.tone(520, 0.07, { type: 'triangle', vol: 0.12, to: 780 }); },
+  count() { this.tone(440, 0.12, { type: 'square', vol: 0.08 }); },
+  start() { [523, 659, 784].forEach((f, i) => this.tone(f, 0.18, { type: 'triangle', vol: 0.14, delay: i * 0.08 })); },
+  launch() { this.noise(0.18, { vol: 0.05, freq: 400, to: 1400, q: 0.6 }); },
+  slice(combo = 1) {
+    const k = 1 + Math.min(combo, 12) * 0.04;
+    this.noise(0.14, { vol: 0.18, freq: 3200 * k, to: 900, q: 0.9 });
+    this.tone(620 * k, 0.1, { type: 'triangle', vol: 0.1, to: 260 });
+  },
+  comboHit(n) { [660, 830, 990, 1320].forEach((f, i) => this.tone(f * (1 + n * 0.002), 0.12, { type: 'triangle', vol: 0.12, delay: i * 0.05 })); },
+  bombClear() { this.tone(110, 0.7, { type: 'sine', vol: 0.4, to: 38 }); this.noise(0.6, { vol: 0.3, freq: 2500, to: 120, q: 0.4, type: 'lowpass' }); },
+  bombHit() { this.noise(0.4, { vol: 0.35, freq: 700, to: 80, q: 0.3, type: 'lowpass' }); this.tone(90, 0.35, { type: 'sawtooth', vol: 0.2, to: 40 }); },
+  over() { [523, 440, 349, 262].forEach((f, i) => this.tone(f, 0.28, { type: 'triangle', vol: 0.14, delay: i * 0.16 })); },
+  setEnabled(on) {
+    this.enabled = on; save.sound = on; persist();
+    document.querySelectorAll('#btnSound,#btnSoundMenu,#pSound').forEach((b) => b.setAttribute('aria-pressed', String(on)));
+    $('btnSoundMenu').textContent = on ? 'Sound on' : 'Sound off';
+    $('pSound').textContent = on ? 'Sound on' : 'Sound off';
+    $('soundWave').style.display = on ? '' : 'none';
+  },
+};
+
+/* =====================================================================
+   Camera + MediaPipe hand tracking (single inference loop)
+   ===================================================================== */
+const video = $('video');
+const camOverlay = $('camOverlay');
+const camCtx = camOverlay.getContext('2d');
+let camState = 'Waiting for camera';
+function setCamState(s) {
+  camState = s;
+  $('camStatus').textContent = s;
+  $('menuCam').textContent = s === 'Waiting for camera' ? 'not started' : s.toLowerCase();
+}
+
+const cam = {
+  stream: null, landmarker: null, running: false, raf: 0, lastInfer: 0, lastVT: -1, _p: null, previewOn: true,
+  start() {
+    if (this.stream && this.landmarker) { this.run(); return Promise.resolve(); }
+    if (this._p) return this._p; // never open two cameras
+    this._p = this._start().finally(() => { this._p = null; });
+    return this._p;
+  },
+  async _start() {
+    setCamState('Initializing');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) {
+      const e = new Error('unsupported'); e.code = 'unsupported'; throw e;
+    }
+    if (!this.stream) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false,
+      });
+      this.stream = stream;
+      stream.getVideoTracks().forEach((t) => t.addEventListener('ended', () => onCameraLost()));
+      video.srcObject = stream;
+      await video.play();
+    }
+    if (!this.landmarker) {
+      try { this.landmarker = await loadLandmarker(); }
+      catch (err) { console.warn('Hand model load failed', err); this.stop(); const e = new Error('model'); e.code = 'model'; throw e; }
+    }
+    setCamState('Ready');
+    this.run();
+  },
+  run() {
+    if (this.running) return;
+    this.running = true;
+    const loop = () => {
+      if (!this.running) return;
+      this.raf = requestAnimationFrame(loop);
+      const now = performance.now();
+      if (now - this.lastInfer < 1000 / CONFIG.inferFps) return;
+      if (video.readyState < 2 || video.currentTime === this.lastVT) return;
+      this.lastVT = video.currentTime; this.lastInfer = now;
+      let res;
+      try { res = this.landmarker.detectForVideo(video, now); } catch { return; }
+      onHandResult(res, now);
+    };
+    this.raf = requestAnimationFrame(loop);
+  },
+  stop() {
+    this.running = false;
+    cancelAnimationFrame(this.raf);
+    releaseStream(this.stream);
+    this.stream = null;
+    video.srcObject = null;
+    stab.reset(); smoother.reset(); blade.last = null; blade.armFrames = 0;
+    setCamState('Waiting for camera');
+    $('cam').hidden = true;
+  },
+};
+
+async function loadLandmarker() {
+  const vision = await import(`${MP_BASE}/vision_bundle.mjs`);
+  const fileset = await vision.FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+  let lastErr;
+  for (const url of MODEL_URLS) {
+    for (const delegate of ['GPU', 'CPU']) {
+      try {
+        return await vision.HandLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: url, delegate },
+          runningMode: 'VIDEO', numHands: 1,
+          minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5,
+        });
+      } catch (e) { lastErr = e; }
+    }
+  }
+  throw lastErr || new Error('model');
+}
+
+function onCameraLost() {
+  if (!cam.stream) return;
+  cam.stop();
+  showSetupError({ code: 'lost', message: 'The camera disconnected. Reconnect it and retry, or play with mouse or touch.' });
+  sm.go('ERROR');
+}
+
+let noHandFrames = 0;
+const calibDone = new Set();
+function onHandResult(res, now) {
+  const lms = res && res.landmarks;
+  if (!lms || !lms.length) {
+    noHandFrames++;
+    if (noHandFrames >= CONFIG.gesture.stableFrames.NO_HAND) {
+      const r = stab.update('NO_HAND');
+      noHandFrames = CONFIG.gesture.stableFrames.NO_HAND;
+      blade.armFrames = 0; smoother.reset(); releaseBlade();
+      if (cam.stream) setCamState('Ready');
+      updateGestureUI(r.stable);
+      drawCamHand(null);
+    }
+    return;
+  }
+  noHandFrames = 0;
+  setCamState('Tracking hand');
+  const lm = lms[0];
+  const info = classifyHand(lm);
+  const { stable, entered } = stab.update(info.gesture);
+  updateGestureUI(stable);
+  drawCamHand(lm);
+
+  if (sm.state === 'CALIBRATING') {
+    $('calibNow').textContent = labelFor(stable);
+    if (entered && ['INDEX_POINTING', 'FIST', 'OPEN_PALM'].includes(entered) && !calibDone.has(entered)) {
+      calibDone.add(entered);
+      document.querySelector(`#calib li[data-g="${entered}"]`).classList.add('done');
+      audio.ui();
+      if (calibDone.size === 3) $('calibStart').disabled = false;
+    }
+    return;
+  }
+
+  if (sm.state === 'PLAYING' && !game.finishing) {
+    if (entered === 'OPEN_PALM') { pauseGame(); return; }
+    if (entered === 'FIST') bombClear();
+  }
+
+  // Blade: index finger extended, and not a fist/palm. Needs a few stable frames after (re)acquiring.
+  const bladeOk = info.gesture === 'INDEX_POINTING' || (info.gesture === 'OTHER_GESTURE' && info.indexExtended && blade.armFrames >= CONFIG.gesture.armFrames);
+  if (bladeOk) {
+    blade.armFrames++;
+    if (blade.armFrames >= CONFIG.gesture.armFrames) {
+      const p = mapToArena(lm[8], W, H);
+      const s = smoother.update(p, now, W, H);
+      if (s.jumped) releaseBlade();
+      if (sm.state === 'PLAYING' || sm.state === 'COUNTDOWN') bladeMove(s.x, s.y, now, sm.state === 'PLAYING' && !game.finishing);
+    }
+  } else {
+    blade.armFrames = 0; smoother.reset(); releaseBlade();
+  }
+}
+
+const LABELS = {
+  NO_HAND: '\u2013 No hand detected', INDEX_POINTING: '\u25B2 Point to slice', FIST: '\u25CF Fist recognized',
+  OPEN_PALM: '\u2726 Palm recognized', OTHER_GESTURE: '\u25C7 Hand detected',
+};
+const labelFor = (g) => LABELS[g].slice(2);
+function updateGestureUI(g) {
+  if (inputMode !== 'camera') return;
+  const el = $('gesture');
+  if (el.dataset.g !== g) { el.dataset.g = g; el.textContent = LABELS[g]; }
+}
+
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+function drawCamHand(lm) {
+  if (!cam.previewOn) return;
+  const w = camOverlay.width, h = camOverlay.height;
+  camCtx.clearRect(0, 0, w, h);
+  if (!lm) return;
+  camCtx.strokeStyle = 'rgba(34,211,238,.9)'; camCtx.lineWidth = 2;
+  camCtx.beginPath();
+  for (const [a, b] of HAND_LINKS) { camCtx.moveTo(lm[a].x * w, lm[a].y * h); camCtx.lineTo(lm[b].x * w, lm[b].y * h); }
+  camCtx.stroke();
+  camCtx.fillStyle = '#FF4D6D'; camCtx.beginPath(); camCtx.arc(lm[8].x * w, lm[8].y * h, 4, 0, 7); camCtx.fill();
+}
+
+/* =====================================================================
+   Fruit art (procedural vector drawing)
+   ===================================================================== */
+const ART = {
+  watermelon: { flesh: '#FF4D6D', rind: '#A3E635', juice: '#FF4D6D', k: 1.2 },
+  orange: { flesh: '#FFC266', rind: '#FF8A1F', juice: '#FFAA33', k: 1 },
+  apple: { flesh: '#F6EBC8', rind: '#E0243F', juice: '#F5E6A8', k: 1 },
+  strawberry: { flesh: '#FF7C92', rind: '#E0183A', juice: '#FF4D6D', k: 0.9 },
+  pineapple: { flesh: '#FFE066', rind: '#E8A317', juice: '#FFD93D', k: 1.05 },
+  lemon: { flesh: '#F6F7A0', rind: '#F2D91B', juice: '#E6F26B', k: 0.95 },
+  peach: { flesh: '#FFC2A3', rind: '#FF9A76', juice: '#FF9A76', k: 0.98 },
+  coconut: { flesh: '#F8F5EE', rind: '#6B4423', juice: '#F1EFE6', k: 1.05 },
+};
+
+function rg(ctx, r, c0, c1, c2) {
+  const g = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
+  g.addColorStop(0, c0); g.addColorStop(0.6, c1); g.addColorStop(1, c2);
+  return g;
+}
+function leaf(ctx, x, y, len, ang, col) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(len * 0.5, -len * 0.45, len, 0); ctx.quadraticCurveTo(len * 0.5, len * 0.35, 0, 0); ctx.fill(); ctx.restore();
+}
+function drawBody(ctx, t, r) {
+  switch (t) {
+    case 'watermelon': {
+      ctx.fillStyle = rg(ctx, r, '#8EE07A', '#2E9A4B', '#14532D'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.clip();
+      ctx.strokeStyle = 'rgba(8,60,30,.55)'; ctx.lineWidth = r * 0.1;
+      for (const k of [-0.62, -0.25, 0.25, 0.62]) {
+        const y = Math.sqrt(1 - k * k) * r; ctx.beginPath(); ctx.moveTo(k * r, -y); ctx.quadraticCurveTo(k * r * 1.6, 0, k * r, y); ctx.stroke();
+      }
+      ctx.restore(); break;
+    }
+    case 'orange': {
+      ctx.fillStyle = rg(ctx, r, '#FFD27A', '#FF9A1F', '#D9650A'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(160,70,0,.25)';
+      for (let i = 0; i < 14; i++) { const a = i * 2.4, d = r * (0.25 + (i % 5) * 0.14); ctx.beginPath(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d, r * 0.025, 0, 7); ctx.fill(); }
+      leaf(ctx, 0, -r * 0.92, r * 0.5, -0.5, '#58B034'); break;
+    }
+    case 'apple': {
+      ctx.fillStyle = rg(ctx, r, '#FF7A85', '#E0243F', '#8E1028'); ctx.beginPath(); ctx.arc(0, r * 0.05, r * 0.98, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(9,11,22,.35)'; ctx.beginPath(); ctx.ellipse(0, -r * 0.88, r * 0.22, r * 0.12, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#6B4423'; ctx.lineWidth = r * 0.07; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -r * 0.85); ctx.lineTo(r * 0.06, -r * 1.15); ctx.stroke();
+      leaf(ctx, r * 0.06, -r * 1.05, r * 0.5, -0.4, '#7FC93A'); break;
+    }
+    case 'strawberry': {
+      ctx.fillStyle = rg(ctx, r, '#FF7C92', '#E0183A', '#8A0E26');
+      ctx.beginPath(); ctx.moveTo(0, r * 1.05); ctx.bezierCurveTo(-r * 1.25, r * 0.25, -r * 1.05, -r * 0.95, 0, -r * 0.8); ctx.bezierCurveTo(r * 1.05, -r * 0.95, r * 1.25, r * 0.25, 0, r * 1.05); ctx.fill();
+      ctx.fillStyle = '#FFE98A';
+      for (let i = 0; i < 12; i++) { const x = ((i * 37) % 100) / 100 - 0.5, y = ((i * 53) % 100) / 100 - 0.35; ctx.beginPath(); ctx.ellipse(x * r * 1.4, y * r * 1.5, r * 0.035, r * 0.055, 0, 0, 7); ctx.fill(); }
+      for (let i = -2; i <= 2; i++) leaf(ctx, 0, -r * 0.8, r * 0.55, -Math.PI / 2 + i * 0.5, '#5DBE3A'); break;
+    }
+    case 'pineapple': {
+      ctx.save(); ctx.scale(0.82, 1);
+      ctx.fillStyle = rg(ctx, r, '#FFE066', '#F0A51B', '#B86A0A'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.clip(); ctx.strokeStyle = 'rgba(120,60,0,.45)'; ctx.lineWidth = r * 0.04;
+      for (let i = -6; i <= 6; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.3 - r, -r); ctx.lineTo(i * r * 0.3 + r, r); ctx.moveTo(i * r * 0.3 + r, -r); ctx.lineTo(i * r * 0.3 - r, r); ctx.stroke(); }
+      ctx.restore();
+      for (let i = -3; i <= 3; i++) leaf(ctx, 0, -r * 0.92, r * 0.8, -Math.PI / 2 + i * 0.32, i % 2 ? '#3FA83A' : '#5DBE3A'); break;
+    }
+    case 'lemon': {
+      ctx.fillStyle = rg(ctx, r, '#FFF59A', '#F2D91B', '#C2A30C');
+      ctx.beginPath(); ctx.moveTo(-r * 1.08, 0); ctx.bezierCurveTo(-r * 0.7, -r * 1.05, r * 0.7, -r * 1.05, r * 1.08, 0); ctx.bezierCurveTo(r * 0.7, r * 1.05, -r * 0.7, r * 1.05, -r * 1.08, 0); ctx.fill(); break;
+    }
+    case 'peach': {
+      ctx.fillStyle = rg(ctx, r, '#FFD7B8', '#FF9A76', '#E0556B'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(160,40,60,.35)'; ctx.lineWidth = r * 0.06; ctx.beginPath(); ctx.arc(-r * 0.25, 0, r * 0.85, -1.2, 1.2); ctx.stroke();
+      leaf(ctx, 0, -r * 0.92, r * 0.55, -0.6, '#6CC04A'); break;
+    }
+    case 'coconut': {
+      ctx.fillStyle = rg(ctx, r, '#9A6A3F', '#6B4423', '#33200F'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,15,5,.4)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 18; i++) { const a = i * 0.7; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3); ctx.lineTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95); ctx.stroke(); }
+      ctx.fillStyle = '#26160A'; for (const [x, y] of [[-0.2, -0.45], [0.2, -0.45], [0, -0.2]]) { ctx.beginPath(); ctx.arc(x * r, y * r, r * 0.09, 0, 7); ctx.fill(); }
+      break;
+    }
+  }
+}
+function drawBomb(ctx, r, pulse) {
+  ctx.strokeStyle = `rgba(255,77,109,${0.5 + pulse * 0.5})`; ctx.lineWidth = r * 0.12;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.12, 0, 7); ctx.stroke();
+  ctx.fillStyle = rg(ctx, r, '#5b6078', '#1a1d2e', '#05060c'); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2b2f45'; ctx.fillRect(-r * 0.22, -r * 1.12, r * 0.44, r * 0.28);
+  ctx.strokeStyle = '#c9a66b'; ctx.lineWidth = r * 0.07; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -r * 1.1); ctx.quadraticCurveTo(r * 0.3, -r * 1.4, r * 0.5, -r * 1.25); ctx.stroke();
+  ctx.fillStyle = pulse > 0.5 ? '#FFAA33' : '#FF4D6D'; ctx.beginPath(); ctx.arc(r * 0.5, -r * 1.27, r * 0.1, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#FF4D6D'; ctx.lineWidth = r * 0.12; ctx.beginPath();
+  ctx.moveTo(-r * 0.3, -r * 0.1); ctx.lineTo(r * 0.3, r * 0.5); ctx.moveTo(r * 0.3, -r * 0.1); ctx.lineTo(-r * 0.3, r * 0.5); ctx.stroke();
+}
+function drawHalf(ctx, t, r, side) {
+  const a = ART[t];
+  ctx.save(); ctx.beginPath(); ctx.rect(side < 0 ? -r * 2 : 0, -r * 2, r * 2, r * 4); ctx.clip();
+  drawBody(ctx, t, r);
+  ctx.fillStyle = a.rind; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.2, r * 0.98, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = a.flesh; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.14, r * 0.88, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+/* =====================================================================
+   Particles (pooled and capped)
+   ===================================================================== */
+const POOL = 700;
+const parts = Array.from({ length: POOL }, () => ({ on: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 3, color: '#fff', spark: false }));
+let partCursor = 0;
+function emit(x, y, vx, vy, life, size, color, spark = false) {
+  const cap = Math.floor(POOL * (quality ? 1 : 0.35));
+  for (let tries = 0; tries < 6; tries++) {
+    const p = parts[partCursor++ % cap];
+    if (!p.on || tries === 5) { Object.assign(p, { on: true, x, y, vx, vy, life, max: life, size, color, spark }); return; }
+  }
+}
+const texts = Array.from({ length: 24 }, () => ({ on: false, x: 0, y: 0, vy: 0, life: 0, max: 1, text: '', color: '#fff', size: 24 }));
+let textCursor = 0;
+function floatText(x, y, text, color = '#F8FAFC', size = 24, life = 0.9) {
+  Object.assign(texts[textCursor++ % texts.length], { on: true, x, y, vy: -60, life, max: life, text, color, size });
+}
+function juiceBurst(x, y, color, n, power) {
+  const k = reduced ? 0.5 : 1;
+  for (let i = 0; i < n * k; i++) {
+    const a = rand(0, 6.283), s = rand(0.2, 1) * power;
+    emit(x, y, Math.cos(a) * s, Math.sin(a) * s - power * 0.2, rand(0.4, 0.9), rand(2, 5.5), color);
+  }
+  for (let i = 0; i < 6 * k; i++) { const a = rand(0, 6.283), s = rand(0.6, 1.2) * power; emit(x, y, Math.cos(a) * s, Math.sin(a) * s, rand(0.15, 0.3), 2, '#FFFFFF', true); }
+}
+
+/* =====================================================================
+   Engine
+   ===================================================================== */
+const unit = () => Math.min(W, H);
+const fruitRadius = () => clamp(unit() * 0.075, 32, 72);
+const gravity = () => H * 1.5 * game.mode.gravity;
+
+function resetGame() {
+  const m = MODES[modeId];
+  Object.assign(game, {
+    mode: m, elapsed: 0, remaining: m.duration ?? 0, fruits: [], halves: [], queue: [], waveT: 0.5, launched: 0, cleared: 0,
+    bombHits: 0, finishing: false, finishT: 0,
+  });
+  score.reset(); bomb.reset(); displayScore = 0;
+  parts.forEach((p) => { p.on = false; }); texts.forEach((t) => { t.on = false; });
+  fx.shake = 0; fx.slow = 0; fx.shockwaves.length = 0; fx.flash = 0;
+  blade.trail.length = 0; blade.last = null; blade.armFrames = 0; blade.swipe++;
+  stab.reset(); smoother.reset();
+}
+
+function launch(item, attract = false) {
+  const r = fruitRadius() * (item.bomb ? 0.95 : ART[item.type].k);
+  const g = gravity();
+  const x = rand(W * 0.12, W * 0.88);
+  const apex = H * rand(0.5, 0.86);
+  const vy = -Math.sqrt(2 * g * (apex + r));
+  const T = (2 * -vy) / g;
+  const tx = attract ? rand(W * 0.45, W * 0.95) : rand(W * 0.15, W * 0.85);
+  game.fruits.push({
+    id: game.nextId++, type: item.type, bomb: item.bomb, x, y: H + r, vx: (tx - x) / T, vy, r,
+    rot: rand(0, 6.28), vr: rand(-4, 4), sliced: false, age: 0,
+  });
+  if (!item.bomb) game.launched++;
+  audio.launch();
+}
+
+function difficulty() { return clamp(game.elapsed / (game.mode.duration ?? 90), 0, 1); }
+function spawnWave() {
+  const d = difficulty(), m = game.mode;
+  const n = 1 + Math.floor(Math.random() * (2 + d * 3));
+  let bombPlaced = false;
+  for (let i = 0; i < n; i++) {
+    const b = m.bombs && game.elapsed > 4 && n >= 2 && i > 0 && !bombPlaced && Math.random() < lerp(0.18, 0.4, d);
+    if (b) bombPlaced = true;
+    game.queue.push({ at: game.elapsed + i * 0.15, bomb: b, type: FRUIT_TYPES[(Math.random() * FRUIT_TYPES.length) | 0] });
+  }
+  game.waveT = lerp(1.7, 0.9, d) * m.interval;
+}
+
+function stepWorld(dt, spawning) {
+  const g = gravity();
+  if (spawning) {
+    game.waveT -= dt;
+    if (game.waveT <= 0) spawnWave();
+    for (let i = game.queue.length - 1; i >= 0; i--) {
+      if (game.queue[i].at <= game.elapsed) { launch(game.queue[i]); game.queue.splice(i, 1); }
+    }
+  }
+  const fs = game.fruits; let w = 0;
+  for (let i = 0; i < fs.length; i++) {
+    const f = fs[i];
+    f.vy += g * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt; f.age += dt;
+    if (!((f.y > H + f.r * 2 && f.vy > 0) || f.x < -f.r * 3 || f.x > W + f.r * 3)) fs[w++] = f;
+  }
+  fs.length = w;
+  const hs = game.halves; w = 0;
+  for (let i = 0; i < hs.length; i++) {
+    const h = hs[i];
+    h.vy += g * dt; h.x += h.vx * dt; h.y += h.vy * dt; h.rot += h.vr * dt;
+    if (h.y < H + h.r * 2) hs[w++] = h;
+  }
+  hs.length = w;
+}
+
+function spawnHalves(f, angle) {
+  const nx = -Math.sin(angle), ny = Math.cos(angle);
+  for (const side of [-1, 1]) {
+    game.halves.push({
+      type: f.type, r: f.r, x: f.x, y: f.y, vx: f.vx * 0.6 + nx * side * 140, vy: f.vy * 0.5 + ny * side * 140 - 60,
+      rot: f.rot + angle, vr: side * rand(1.5, 4), side,
+    });
+  }
+}
+
+function sliceFruit(f, angle) {
+  f.sliced = true;
+  const res = score.slice(FRUIT_POINTS[f.type], game.elapsed, blade.swipe);
+  spawnHalves(f, angle);
+  juiceBurst(f.x, f.y, ART[f.type].juice, 16, unit() * 0.7);
+  floatText(f.x, f.y - f.r, `+${res.pts}`, res.mult > 1 ? '#FFAA33' : '#F8FAFC', 26);
+  audio.slice(res.combo);
+  if (res.combo > 0 && res.combo % 5 === 0) {
+    floatText(W / 2, H * 0.3, `COMBO x${res.combo}`, '#22D3EE', 44, 1.1);
+    audio.comboHit(res.combo);
+    if (!reduced) fx.slow = 0.14;
+  }
+  if (res.swipeBonus > 0) floatText(f.x, f.y + f.r * 0.6, `Swipe bonus +${res.swipeBonus}`, '#A3E635', 18);
+}
+
+function hitBomb(b) {
+  b.sliced = true;
+  juiceBurst(b.x, b.y, '#FF4D6D', 26, unit() * 0.9);
+  score.penalty(CONFIG.score.bombPenalty); score.breakCombo();
+  game.bombHits++;
+  floatText(b.x, b.y, `-${CONFIG.score.bombPenalty}`, '#FF4D6D', 34, 1.1);
+  fx.flash = 0.35; if (!reduced) fx.shake = 0.5;
+  audio.bombHit();
+  if (game.mode.lives && game.bombHits >= game.mode.lives) beginFinish();
+}
+
+function bombClear() {
+  if (sm.state !== 'PLAYING' || game.finishing) return;
+  const targets = game.fruits.filter((f) => !f.sliced);
+  if (!targets.length) { toast('Nothing to clear yet'); return; }
+  if (!bomb.tryUse()) return;
+  fx.shockwaves.push({ t: 0 });
+  if (!reduced) fx.shake = 0.8;
+  let pts = 0;
+  for (const f of targets) {
+    f.sliced = true;
+    if (f.bomb) { juiceBurst(f.x, f.y, '#22D3EE', 10, unit() * 0.6); continue; }
+    pts += CONFIG.score.bombClearPerFruit; game.cleared++;
+    spawnHalves(f, rand(0, 3.14));
+    juiceBurst(f.x, f.y, ART[f.type].juice, 12, unit() * 0.8);
+  }
+  score.add(pts);
+  for (let i = 0; i < 70; i++) { const a = rand(0, 6.283), s = rand(0.3, 1.4) * unit(); emit(W / 2, H / 2, Math.cos(a) * s, Math.sin(a) * s, rand(0.3, 0.8), rand(2, 4), '#22D3EE', true); }
+  floatText(W / 2, H * 0.42, 'BOMB CLEAR!', '#FFAA33', 52, 1.3);
+  if (pts) floatText(W / 2, H * 0.52, `+${pts}`, '#F8FAFC', 30, 1.1);
+  audio.bombClear();
+}
+
+/* ---- blade ---- */
+function releaseBlade() { if (blade.last) blade.swipe++; blade.last = null; }
+function bladeMove(x, y, now, canSlice) {
+  const prev = blade.last;
+  blade.trail.push({ x, y, t: now });
+  if (blade.trail.length > 40) blade.trail.shift();
+  if (prev && canSlice) {
+    const dt = Math.max(0.008, (now - blade.lastT) / 1000);
+    const len = Math.hypot(x - prev.x, y - prev.y);
+    if (len / dt >= unit() * 0.22) { // must actually be swiping
+      const angle = Math.atan2(y - prev.y, x - prev.x);
+      for (const f of game.fruits) {
+        if (f.sliced) continue;
+        if (segmentHitsCircle(prev.x, prev.y, x, y, f.x, f.y, f.r * 0.95 + 6)) {
+          if (f.bomb) hitBomb(f); else sliceFruit(f, angle);
+        }
+      }
+    }
+  }
+  blade.last = { x, y }; blade.lastT = now;
+}
+
+/* ---- round lifecycle ---- */
+function beginRound() {
+  audio.unlock();
+  resetGame();
+  game.countN = 3; game.countT = 0;
+  sm.go('COUNTDOWN');
+}
+function beginFinish() {
+  if (game.finishing) return;
+  game.finishing = true; game.finishT = 0.9; releaseBlade();
+}
+function endRound() {
+  if (!sm.go('GAME_OVER')) return;
+  audio.over();
+  const prevBest = save.best[modeId];
+  const isBest = score.score > prevBest;
+  if (isBest) { save.best[modeId] = score.score; persist(); }
+  $('oScore').textContent = score.score;
+  $('oBest').textContent = save.best[modeId];
+  $('oSliced').textContent = `${score.sliced} / ${game.launched}`;
+  $('oSlicedLbl').textContent = 'Fruit sliced of launched';
+  $('oCombo').textContent = score.bestCombo;
+  $('oCleared').textContent = game.cleared;
+  $('oNew').hidden = !(isBest && score.score > 0);
+}
+function pauseGame() {
+  if (sm.state !== 'PLAYING' || game.finishing) return;
+  if (!sm.go('PAUSED')) return;
+  releaseBlade(); blade.armFrames = 0; smoother.reset();
+  audio.ui();
+}
+function resumeGame() {
+  if (!sm.go('PLAYING')) return;
+  blade.armFrames = 0; smoother.reset(); blade.last = null; // re-acquire before slicing
+  audio.ui();
+}
+function toMenu() {
+  releaseBlade();
+  resetGame();
+  sm.go('MENU');
+}
+
+/* =====================================================================
+   Frame loop
+   ===================================================================== */
+let lastTs = 0, slowAvg = 16, attractBlade = null, attractT = 0;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const real = Math.min(0.05, (ts - lastTs) / 1000 || 0.016);
+  lastTs = ts;
+  slowAvg = slowAvg * 0.95 + real * 1000 * 0.05;
+  if (slowAvg > 26 && quality) quality = 0; // graceful quality drop: fewer particles, no glow blur
+
+  let dt = real;
+  if (fx.slow > 0) { fx.slow -= real; dt = real * 0.35; }
+  const s = sm.state;
+
+  if (s === 'MENU') attract(dt);
+  else if (s === 'COUNTDOWN') {
+    game.countT += real;
+    const n = 3 - Math.floor(game.countT / 0.8);
+    if (n !== game.countN || game.countT === real) {
+      game.countN = n;
+      if (n >= 1) { $('cdNum').textContent = n; audio.count(); } else if (n === 0) { $('cdNum').textContent = 'GO!'; audio.start(); }
+      $('cdNum').style.animation = 'none'; void $('cdNum').offsetWidth; $('cdNum').style.animation = '';
+    }
+    if (game.countT >= 3.2) { sm.go('PLAYING'); blade.armFrames = 0; maybeHint(); }
+  } else if (s === 'PLAYING') {
+    game.elapsed += real;
+    bomb.update(real);
+    score.expire(game.elapsed);
+    if (!game.finishing) {
+      stepWorld(dt, true);
+      if (game.mode.duration) { game.remaining = Math.max(0, game.mode.duration - game.elapsed); if (game.remaining <= 0) beginFinish(); }
+    } else {
+      stepWorld(dt, false);
+      game.finishT -= real;
+      if (game.finishT <= 0) endRound();
+    }
+  }
+  stepParticles(dt);
+  render(real);
+  updateHUD(real);
+}
+
+function stepParticles(dt) {
+  const g = H * 1.2;
+  for (const p of parts) {
+    if (!p.on) continue;
+    p.life -= dt; if (p.life <= 0) { p.on = false; continue; }
+    if (!p.spark) p.vy += g * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  for (const t of texts) { if (!t.on) continue; t.life -= dt; if (t.life <= 0) { t.on = false; continue; } t.y += t.vy * dt; }
+  for (let i = fx.shockwaves.length - 1; i >= 0; i--) { fx.shockwaves[i].t += dt; if (fx.shockwaves[i].t > 0.8) fx.shockwaves.splice(i, 1); }
+  fx.shake = Math.max(0, fx.shake - dt * 2.2);
+  fx.flash = Math.max(0, fx.flash - dt);
+}
+
+/* attract mode on the landing screen: decorative only, never touches score/save */
+function attract(dt) {
+  attractT += dt;
+  game.elapsed += dt;
+  if (attractT > 1.15) {
+    attractT = 0;
+    launch({ bomb: false, type: FRUIT_TYPES[(Math.random() * FRUIT_TYPES.length) | 0] }, true);
+    game.launched = 0;
+  }
+  stepWorld(dt, false);
+  if (!attractBlade) {
+    const f = game.fruits.find((q) => !q.sliced && q.age > 0.55 && q.y < H * 0.8 && q.x > 0 && q.x < W);
+    if (f) attractBlade = { f, p: 0, ang: rand(-0.9, -0.3), dir: Math.random() < 0.5 ? 1 : -1 };
+  } else {
+    const a = attractBlade; a.p += dt * 6;
+    const f = a.f, L = f.r * 3.2;
+    const px = f.x + Math.cos(a.ang) * (a.p - 0.5) * L * a.dir, py = f.y + Math.sin(a.ang) * (a.p - 0.5) * L * a.dir;
+    blade.trail.push({ x: px, y: py, t: performance.now() });
+    if (a.p >= 0.5 && !f.sliced) { f.sliced = true; spawnHalves(f, a.ang); juiceBurst(f.x, f.y, ART[f.type].juice, 14, unit() * 0.6); }
+    if (a.p >= 1) attractBlade = null;
+  }
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+const canvas = $('stage');
+const ctx = canvas.getContext('2d');
+let bgGrad = null;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bgGrad = ctx.createRadialGradient(W * 0.5, H * 0.35, 0, W * 0.5, H * 0.5, Math.hypot(W, H) * 0.7);
+  bgGrad.addColorStop(0, '#1b1f40'); bgGrad.addColorStop(0.55, '#12162A'); bgGrad.addColorStop(1, '#090B16');
+}
+
+function render() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  if (fx.shake > 0) { const m = fx.shake * 14; ctx.translate(rand(-m, m), rand(-m, m)); }
+
+  for (const sw of fx.shockwaves) {
+    const k = sw.t / 0.8, rr = k * Math.hypot(W, H) * 0.6;
+    ctx.strokeStyle = `rgba(34,211,238,${1 - k})`; ctx.lineWidth = 18 * (1 - k) + 2;
+    ctx.beginPath(); ctx.arc(W / 2, H / 2, rr, 0, 7); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,170,51,${(1 - k) * 0.7})`; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(W / 2, H / 2, rr * 0.85, 0, 7); ctx.stroke();
+  }
+  for (const h of game.halves) { ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.rot); drawHalf(ctx, h.type, h.r, h.side); ctx.restore(); }
+  const pulse = (Math.sin(performance.now() / 120) + 1) / 2;
+  for (const f of game.fruits) {
+    if (f.sliced) continue;
+    ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+    if (f.bomb) drawBomb(ctx, f.r, pulse); else drawBody(ctx, f.type, f.r);
+    ctx.restore();
+  }
+
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of parts) {
+    if (!p.on) continue;
+    const a = clamp(p.life / p.max, 0, 1);
+    ctx.globalAlpha = a; ctx.fillStyle = p.color;
+    if (p.spark) { ctx.fillRect(p.x - 1, p.y - 1, 3, 3); } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + a * 0.6), 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  drawTrail();
+  ctx.globalCompositeOperation = 'source-over';
+
+  for (const t of texts) {
+    if (!t.on) continue;
+    const a = clamp(t.life / t.max * 2, 0, 1);
+    ctx.globalAlpha = a; ctx.font = `${t.size}px Bungee, Impact, sans-serif`; ctx.textAlign = 'center';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(9,11,22,.8)'; ctx.strokeText(t.text, t.x, t.y);
+    ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  if (fx.flash > 0) $('flash').style.opacity = String(fx.flash); else if ($('flash').style.opacity !== '0') $('flash').style.opacity = '0';
+}
+
+const TRAIL_LIFE = 260;
+function drawTrail() {
+  const now = performance.now();
+  const tr = blade.trail;
+  while (tr.length && now - tr[0].t > TRAIL_LIFE) tr.shift();
+  if (tr.length < 2) return;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 1; i < tr.length; i++) {
+      const a = tr[i - 1], b = tr[i];
+      const k = 1 - (now - b.t) / TRAIL_LIFE;
+      if (k <= 0) continue;
+      if (b.t - a.t > 120) continue; // gap = separate swipe
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      if (pass === 0) { ctx.strokeStyle = `rgba(139,92,246,${0.35 * k})`; ctx.lineWidth = 26 * k; }
+      else if (pass === 1) { ctx.strokeStyle = `rgba(34,211,238,${0.7 * k})`; ctx.lineWidth = 11 * k; }
+      else { ctx.strokeStyle = `rgba(255,255,255,${k})`; ctx.lineWidth = 4.5 * k; }
+      if (quality && pass === 1) { ctx.shadowColor = '#22D3EE'; ctx.shadowBlur = 14; } else ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+}
+
+/* =====================================================================
+   HUD / UI
+   ===================================================================== */
+const hud = { score: -1, time: '', combo: '', bar: -1, bomb: '' };
+function updateHUD(real) {
+  if (sm.state === 'MENU' || sm.state === 'GAME_OVER') return;
+  displayScore += (score.score - displayScore) * Math.min(1, real * 12);
+  const ds = Math.round(displayScore);
+  if (ds !== hud.score) { hud.score = ds; $('hScore').textContent = ds; }
+  const timed = !!game.mode.duration;
+  const t = timed ? Math.ceil(game.remaining) : Math.floor(game.elapsed);
+  const ts = String(t);
+  if (ts !== hud.time) { hud.time = ts; $('hTime').textContent = timed ? ts : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; }
+  const bar = timed ? game.remaining / game.mode.duration : 1;
+  if (Math.abs(bar - hud.bar) > 0.004) { hud.bar = bar; $('timeBar').style.transform = `scaleX(${bar})`; }
+  const c = score.combo > 1 ? `Combo x${score.combo}` : '';
+  if (c !== hud.combo) { hud.combo = c; $('hCombo').textContent = c; }
+  const bt = bomb.ready ? 'Bomb clear ready' : `Bomb clear ${Math.ceil(bomb.remaining)}s`;
+  if (bt !== hud.bomb) { hud.bomb = bt; $('bombText').textContent = bt; $('bombBtn').classList.toggle('ready', bomb.ready); }
+  $('bombFill').style.transform = `scaleX(${bomb.progress})`;
+  if (game.mode.lives) { $('lives').hidden = false; $('lives').textContent = `Bombs left: ${Math.max(0, game.mode.lives - game.bombHits)}`; } else $('lives').hidden = true;
+}
+
+let toastT = 0;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2200);
+}
+function maybeHint() {
+  if (save.hintSeen) return;
+  save.hintSeen = true; persist();
+  const el = $('hint');
+  el.textContent = inputMode === 'camera' ? 'Point your index finger and swipe through the fruit.' : 'Move your mouse or finger across the fruit.';
+  el.hidden = false; setTimeout(() => { el.hidden = true; }, 5000);
+}
+
+function showSetupError(e) {
+  const info = e.message && e.code && !e.name ? e : classifyCameraError(e);
+  $('setupSpin').hidden = true;
+  $('setupTitle').textContent = 'Camera unavailable';
+  $('setupMsg').textContent = info.message;
+  $('btnRetry').hidden = false; $('btnSetupPointer').hidden = false;
+  setCamState('Camera unavailable');
+  $('btnRetry').focus();
+}
+
+function applyState(s) {
+  $('menu').hidden = s !== 'MENU';
+  $('setup').hidden = !(s === 'SETUP' || s === 'ERROR');
+  $('calib').hidden = s !== 'CALIBRATING';
+  $('countdown').hidden = s !== 'COUNTDOWN';
+  $('pause').hidden = s !== 'PAUSED';
+  $('over').hidden = s !== 'GAME_OVER';
+  const inGame = ['COUNTDOWN', 'PLAYING', 'PAUSED'].includes(s);
+  $('hud').hidden = !inGame;
+  $('hudBottom').hidden = !inGame;
+  $('gesture').hidden = inputMode !== 'camera';
+  $('cam').hidden = !(cam.stream && s !== 'MENU');
+  $('hBest').textContent = save.best[modeId];
+  $('menuBest').textContent = save.best[modeId];
+  $('pFinish').hidden = !(game.mode.lives || !game.mode.duration);
+  if (s !== 'SETUP' && s !== 'ERROR') { $('setupSpin').hidden = false; }
+  if (s === 'MENU') { game.fruits.length = 0; game.halves.length = 0; blade.trail.length = 0; attractBlade = null; $('hint').hidden = true; }
+  const first = document.querySelector(`#${{ MENU: 'menu', SETUP: 'setup', ERROR: 'setup', CALIBRATING: 'calib', PAUSED: 'pause', GAME_OVER: 'over' }[s]} [data-autofocus]`);
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 30);
+}
+
+/* =====================================================================
+   Wiring
+   ===================================================================== */
+let setupToken = 0;
+async function runCameraSetup() {
+  const token = ++setupToken;
+  $('setupSpin').hidden = false; $('setupTitle').textContent = 'Starting camera';
+  $('setupMsg').textContent = 'Allow camera access when your browser asks. Video stays on your device.';
+  $('btnRetry').hidden = true; $('btnSetupPointer').hidden = true;
+  try {
+    await cam.start();
+    if (token !== setupToken || sm.state !== 'SETUP') return;
+    $('cam').hidden = false;
+    if (save.calibrated) beginRound();
+    else { calibDone.clear(); document.querySelectorAll('#calib li').forEach((li) => li.classList.remove('done')); $('calibStart').disabled = true; sm.go('CALIBRATING'); }
+  } catch (e) {
+    if (token !== setupToken) return;
+    showSetupError(classifyCameraError(e));
+    sm.go('ERROR');
+  }
+}
+function startFlow() {
+  audio.unlock(); audio.ui();
+  inputMode = 'camera'; // PLAY NOW always means gesture control; mouse/touch is a separate, labelled button
+  if (sm.go('SETUP')) runCameraSetup();
+}
+function usePointer() {
+  audio.unlock(); inputMode = 'pointer';
+  cam.stop(); setupToken++;
+  beginRound();
+}
+
+$('btnPlay').onclick = startFlow;
+$('btnHow').onclick = () => { audio.unlock(); audio.ui(); $('howto').hidden = false; $('howStart').focus(); };
+$('howClose').onclick = () => { $('howto').hidden = true; $('btnHow').focus(); };
+$('howStart').onclick = () => { $('howto').hidden = true; startFlow(); };
+$('btnPointer').onclick = usePointer;
+$('btnRetry').onclick = () => { audio.ui(); if (sm.go('SETUP') || sm.state === 'SETUP') runCameraSetup(); };
+$('btnSetupPointer').onclick = usePointer;
+$('btnSetupBack').onclick = () => { setupToken++; sm.go('MENU'); };
+$('calibStart').onclick = () => { save.calibrated = true; persist(); beginRound(); };
+$('calibSkip').onclick = () => { save.calibrated = true; persist(); beginRound(); };
+$('btnPause').onclick = () => { audio.unlock(); pauseGame(); };
+$('btnSound').onclick = $('btnSoundMenu').onclick = $('pSound').onclick = () => { audio.unlock(); audio.setEnabled(!audio.enabled); audio.ui(); };
+$('pResume').onclick = resumeGame;
+$('pRestart').onclick = () => { audio.ui(); beginRound(); };
+$('pFinish').onclick = () => { if (sm.go('PLAYING')) beginFinish(); };
+$('pMenu').onclick = () => { audio.ui(); toMenu(); };
+$('pVol').oninput = (e) => { const v = e.target.value / 100; audio.setVol(v); save.volume = v; persist(); };
+$('oAgain').onclick = () => { audio.ui(); beginRound(); };
+$('oMenu').onclick = () => { audio.ui(); toMenu(); };
+$('bombBtn').onclick = bombClear;
+$('btnHideCam').onclick = () => {
+  cam.previewOn = !cam.previewOn;
+  $('camView').classList.toggle('off', !cam.previewOn);
+  $('btnHideCam').textContent = cam.previewOn ? 'Hide preview' : 'Show preview';
+};
+$('btnStopCam').onclick = () => {
+  const wasPlaying = sm.state === 'PLAYING';
+  if (wasPlaying) pauseGame();
+  cam.stop();
+  showSetupError({ code: 'stopped', message: 'Camera stopped. Retry camera to keep playing with gestures, or play with mouse or touch.' });
+  $('setupTitle').textContent = 'Camera stopped';
+  sm.go('ERROR');
+};
+
+document.querySelectorAll('.modes button').forEach((b) => {
+  b.onclick = () => {
+    modeId = b.dataset.mode; audio.unlock(); audio.ui();
+    document.querySelectorAll('.modes button').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+    $('modeDesc').textContent = MODES[modeId].desc;
+    $('menuBest').textContent = save.best[modeId]; $('hBest').textContent = save.best[modeId];
+    resetGame();
+  };
+});
+
+/* pointer / touch fallback (clearly a fallback; gesture tracking is the main path) */
+canvas.addEventListener('pointermove', (e) => {
+  if (inputMode !== 'pointer') return;
+  if (sm.state === 'PLAYING' || sm.state === 'COUNTDOWN') bladeMove(e.clientX, e.clientY, performance.now(), sm.state === 'PLAYING' && !game.finishing);
+});
+canvas.addEventListener('pointerup', () => releaseBlade());
+canvas.addEventListener('pointerleave', () => releaseBlade());
+canvas.addEventListener('pointerdown', (e) => { if (inputMode === 'pointer') { blade.last = null; blade.swipe++; canvas.setPointerCapture?.(e.pointerId); } });
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (!$('howto').hidden) { $('howClose').click(); return; }
+    if (sm.state === 'PLAYING') pauseGame(); else if (sm.state === 'PAUSED') resumeGame();
+  } else if (e.key === 'p' || e.key === 'P') {
+    if (sm.state === 'PLAYING') pauseGame(); else if (sm.state === 'PAUSED') resumeGame();
+  } else if (e.key === 'b' || e.key === 'B') bombClear();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && sm.state === 'PLAYING') pauseGame(); });
+window.addEventListener('pagehide', () => { cam.stop(); cam.landmarker?.close?.(); });
+window.addEventListener('resize', resize);
+
+/* init */
+$('boot').remove(); // the page shows a "script did not start" notice unless this line runs
+window.addEventListener('error', (e) => { toast(`Error: ${e.message}`); });
+window.addEventListener('unhandledrejection', (e) => { toast(`Error: ${e.reason && e.reason.message || e.reason}`); });
+resize();
+audio.setEnabled(save.sound);
+$('pVol').value = Math.round(save.volume * 100);
+$('modeDesc').textContent = MODES[modeId].desc;
+applyState('MENU');
+setCamState('Waiting for camera');
+requestAnimationFrame(frame);
+
+// Exposed for browser-automation tests only; unused by the game itself.
+window.__gfn = { sm, score, game, bomb, get quality() { return quality; } };
+
+</script>
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center">This game needs JavaScript.</p></noscript>
+</body>
+</html>
